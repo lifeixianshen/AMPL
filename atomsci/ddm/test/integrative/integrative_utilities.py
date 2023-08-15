@@ -55,10 +55,8 @@ def get_subdirectory(model_dir_root):
 
     # Get subdirectory: model uuid
     walker = os.walk(model_dir_root)
-    dirs = [d for d in walker]
-    uuid = dirs[0][1][0]
-
-    return uuid
+    dirs = list(walker)
+    return dirs[0][1][0]
 
 
 def training_statistics_file(model_dir, subset, minimum_r2):
@@ -75,7 +73,7 @@ def training_statistics_file(model_dir, subset, minimum_r2):
     assert (os.path.exists(model_dir)), 'Error: Result directory does not exist'
 
     # Open training model metrics file
-    training_model_metrics_file = model_dir+'/training_model_metrics.json'
+    training_model_metrics_file = f'{model_dir}/training_model_metrics.json'
     assert (os.path.exists(training_model_metrics_file)), 'Error: Model metadata file does not exist'
     with open(training_model_metrics_file) as f:
         training_model_metrics = json.loads(f.read())

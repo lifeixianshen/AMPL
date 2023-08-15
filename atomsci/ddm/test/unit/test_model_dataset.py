@@ -52,27 +52,37 @@ def test_create_model_dataset():
     (params_from_file_scaffold, dataset_obj_from_file_scaffold, df_delaney) = utils.delaney_objects(
         split_strategy="train_valid_test", splitter="scaffold")
 
-    test_list = []
-    test_list.append(isinstance(dataset_obj_from_file, model_dataset.FileDataset))
-
-
+    test_list = [isinstance(dataset_obj_from_file, model_dataset.FileDataset)]
     methods = ["load_full_dataset","check_task_columns","load_featurized_data","get_featurized_data","get_dataset_tasks","split_dataset","get_split_metadata","save_split_dataset","load_presplit_dataset","save_featurized_data","combined_training_data"]
     #testing datastore
     if not datastore_is_down:
         test_list.append(isinstance(dataset_obj_from_datastore, model_dataset.DatastoreDataset))
 
-        for method in methods:
-            test_list.append(callable(getattr(dataset_obj_from_datastore,method)))
-        test_list.append(dataset_obj_from_datastore.ds_client is not None)
-        test_list.append(dataset_obj_from_datastore.dataset_name)
-
+        test_list.extend(
+            callable(getattr(dataset_obj_from_datastore, method))
+            for method in methods
+        )
+        test_list.extend(
+            (
+                dataset_obj_from_datastore.ds_client is not None,
+                dataset_obj_from_datastore.dataset_name,
+            )
+        )
     #testing from file
-    for method in methods:
-        test_list.append(callable(getattr(dataset_obj_from_file,method)))
-
-    test_list.append(isinstance(dataset_obj_from_file.featurization, feat.DynamicFeaturization))
-    test_list.append(isinstance(dataset_obj_from_file.splitting, split.TrainValidTestSplitting))
-    test_list.append(dataset_obj_from_file.dataset_name)
+    test_list.extend(
+        callable(getattr(dataset_obj_from_file, method)) for method in methods
+    )
+    test_list.extend(
+        (
+            isinstance(
+                dataset_obj_from_file.featurization, feat.DynamicFeaturization
+            ),
+            isinstance(
+                dataset_obj_from_file.splitting, split.TrainValidTestSplitting
+            ),
+            dataset_obj_from_file.dataset_name,
+        )
+    )
     assert all(test_list)
 
 
@@ -102,12 +112,11 @@ def test_get_dataset_tasks():
     (params_from_file_scaffold, dataset_obj_from_file_scaffold, df_delaney) = utils.delaney_objects(
         split_strategy="train_valid_test", splitter="scaffold")
 
-    test_list = []
-
     flag_tasks_from_file = dataset_obj_from_file.get_dataset_tasks(delaney_from_disk)
-    test_list.append(flag_tasks_from_file)
-    test_list.append(dataset_obj_from_file.tasks == params_from_file.response_cols)
-
+    test_list = [
+        flag_tasks_from_file,
+        dataset_obj_from_file.tasks == params_from_file.response_cols,
+    ]
     subset_delaney = delaney_from_disk[['Compound ID','smiles','measured log solubility in mols per litre','Polar Surface Area']]
 
     # ksm: These tests are commented out because we no longer support datasets where response_cols is None.
@@ -120,23 +129,27 @@ def test_get_dataset_tasks():
 
     if not datastore_is_down:
         flag_tasks_from_ds = dataset_obj_from_datastore.get_dataset_tasks(df_datastore)
-        test_list.append(flag_tasks_from_ds)
-        test_list.append(dataset_obj_from_datastore.tasks == params_from_ds.response_cols)
-
+        test_list.extend(
+            (
+                flag_tasks_from_ds,
+                dataset_obj_from_datastore.tasks
+                == params_from_ds.response_cols,
+            )
+        )
         subset_datastore = df_datastore[['compound_id','rdkit_smiles','PIC50']]
 
-        # TODO (ksm): The following test fails because the task name stored in the dataset metadata differs from the response_cols
-        # parameter specified when the ModelDataset was created for this dataset. Need to find a better dataset.
-        # flag_tasks_from_ds_noy = dataset_obj_from_datastore_noy.get_dataset_tasks(subset_datastore)
-        # test_list.append(flag_tasks_from_ds_noy)
-        # test_list.append(sorted(dataset_obj_from_datastore_noy.tasks) == sorted(['PIC50']))
+            # TODO (ksm): The following test fails because the task name stored in the dataset metadata differs from the response_cols
+            # parameter specified when the ModelDataset was created for this dataset. Need to find a better dataset.
+            # flag_tasks_from_ds_noy = dataset_obj_from_datastore_noy.get_dataset_tasks(subset_datastore)
+            # test_list.append(flag_tasks_from_ds_noy)
+            # test_list.append(sorted(dataset_obj_from_datastore_noy.tasks) == sorted(['PIC50']))
 
-        # ksm: For datastore datasets, the following test never fails because the task name is retrieved from the dataset metadata
-        #dataset_obj_from_datastore_noy.tasks = None
-        #flag_tasks_from_ds_failure = dataset_obj_from_datastore_noy.get_dataset_tasks(subset_datastore[['compound_id','rdkit_smiles']])
-        #test_list.append(not flag_tasks_from_ds_failure)
+            # ksm: For datastore datasets, the following test never fails because the task name is retrieved from the dataset metadata
+            #dataset_obj_from_datastore_noy.tasks = None
+            #flag_tasks_from_ds_failure = dataset_obj_from_datastore_noy.get_dataset_tasks(subset_datastore[['compound_id','rdkit_smiles']])
+            #test_list.append(not flag_tasks_from_ds_failure)
 
-        # TODO (ksm): Add tests for a multitask dataset
+            # TODO (ksm): Add tests for a multitask dataset
     print(test_list)
     assert all(test_list)
 
@@ -198,11 +211,15 @@ def test_get_featurized_data():
 
     dataset_obj_from_file.params.transformers = True
     dataset_obj_from_file.get_featurized_data()
-    test_list = []
-    test_list.append(dataset_obj_from_file.n_features == params_from_file.ecfp_size)
-    test_list.append(isinstance(dataset_obj_from_file.dataset, dc.data.datasets.DiskDataset))
-    test_list.append(len(dataset_obj_from_file.dataset) == len(df_delaney))
-    test_list.append(dataset_obj_from_file.n_features == dataset_obj_from_file.params.ecfp_size)
+    test_list = [
+        dataset_obj_from_file.n_features == params_from_file.ecfp_size,
+        isinstance(
+            dataset_obj_from_file.dataset, dc.data.datasets.DiskDataset
+        ),
+        len(dataset_obj_from_file.dataset) == len(df_delaney),
+        dataset_obj_from_file.n_features
+        == dataset_obj_from_file.params.ecfp_size,
+    ]
     assert all(test_list)
 
 
@@ -218,12 +235,17 @@ def test_get_featurized_data_scaffold():
     dataset_obj_from_file_scaffold.params.transformers = True
     dataset_obj_from_file_scaffold.get_featurized_data()
 
-    test_list = []
-
-    test_list.append(isinstance(dataset_obj_from_file_scaffold.dataset, dc.data.datasets.DiskDataset))
-    test_list.append(len(dataset_obj_from_file_scaffold.dataset) == len(df_delaney))
-    test_list.append(dataset_obj_from_file.n_features == dataset_obj_from_file.params.ecfp_size)
-    test_list.append(len(dataset_obj_from_file.dataset.y) == len(dataset_obj_from_file.dataset.ids))
+    test_list = [
+        isinstance(
+            dataset_obj_from_file_scaffold.dataset,
+            dc.data.datasets.DiskDataset,
+        ),
+        len(dataset_obj_from_file_scaffold.dataset) == len(df_delaney),
+        dataset_obj_from_file.n_features
+        == dataset_obj_from_file.params.ecfp_size,
+        len(dataset_obj_from_file.dataset.y)
+        == len(dataset_obj_from_file.dataset.ids),
+    ]
 
     assert all(test_list)
 
@@ -241,9 +263,11 @@ def test_split_dataset():
     (train, valid) = dataset_obj_from_file.train_valid_dsets[0]
     (train_attr, valid_attr) = dataset_obj_from_file.train_valid_attr[0]
 
-    test_list = []
-    test_list.append(len(dataset_obj_from_file.dataset) == len(train) + len(valid) + len(dataset_obj_from_file.test_dset))
-    test_list.append(set(train.ids.tolist()) == set(train_attr.index.tolist()))
+    test_list = [
+        len(dataset_obj_from_file.dataset)
+        == len(train) + len(valid) + len(dataset_obj_from_file.test_dset),
+        set(train.ids.tolist()) == set(train_attr.index.tolist()),
+    ]
     test_list.append(set(valid.ids.tolist()) == set(valid_attr.index.tolist()))
     test_list.append(set(dataset_obj_from_file.test_dset.ids.tolist()) == set(dataset_obj_from_file.test_attr.index.tolist()))
 
@@ -286,17 +310,16 @@ def test_load_presplit_dataset():
     (orig_train, orig_valid) = dataset_obj_from_file.train_valid_dsets[0]
     (orig_train_attr, orig_valid_attr) = dataset_obj_from_file.train_valid_attr[0]
     dataset_obj_from_file.save_split_dataset()
-    
+
     # Need to pass the split_uuid to recover the split we just saved
     (params_from_file2, dataset_obj_from_file2, df_delaney2) = utils.delaney_objects(split_uuid = dataset_obj_from_file.split_uuid)
     dataset_obj_from_file2.get_featurized_data()
     dataset_obj_from_file2.load_presplit_dataset()
     (train, valid) = dataset_obj_from_file2.train_valid_dsets[0]
-    
+
     (train_attr, valid_attr) = dataset_obj_from_file2.train_valid_attr[0]
-    
-    test_list = []
-    test_list.append((train.y == orig_train.y).all())
+
+    test_list = [(train.y == orig_train.y).all()]
     test_list.append((valid.y == orig_valid.y).all())
     test_list.append(train_attr.equals(orig_train_attr))
     test_list.append(valid_attr.equals(orig_valid_attr))
@@ -333,10 +356,14 @@ def test_split_dataset_scaffold():
     dataset_obj_from_file_scaffold.split_dataset()
     (train, valid) = dataset_obj_from_file_scaffold.train_valid_dsets[0]
     (train_attr, valid_attr) = dataset_obj_from_file_scaffold.train_valid_attr[0]
-    
-    test_list = []
-    test_list.append(len(dataset_obj_from_file.dataset) == len(train) + len(valid) + len(dataset_obj_from_file_scaffold.test_dset))
-    test_list.append(set(train.ids.tolist()) == set(train_attr.index.tolist()))
+
+    test_list = [
+        len(dataset_obj_from_file.dataset)
+        == len(train)
+        + len(valid)
+        + len(dataset_obj_from_file_scaffold.test_dset),
+        set(train.ids.tolist()) == set(train_attr.index.tolist()),
+    ]
     test_list.append(set(valid.ids.tolist()) == set(valid_attr.index.tolist()))
     test_list.append(set(dataset_obj_from_file_scaffold.test_dset.ids.tolist()) == set(dataset_obj_from_file_scaffold.test_attr.index.tolist()))
     assert all(test_list)
@@ -351,11 +378,13 @@ def test_combine_training_data_scaffold():
 
     dataset_obj_from_file_scaffold.combined_training_data()
     (orig_train, orig_valid) = dataset_obj_from_file_scaffold.train_valid_dsets[0]
-    test_list = []
-    test_list.append(isinstance(dataset_obj_from_file_scaffold.combined_train_valid_data,DD))
-    test_list.append(len(dataset_obj_from_file_scaffold.combined_train_valid_data.y)==len(dataset_obj_from_file_scaffold.combined_train_valid_data.ids))
-
-    
+    test_list = [
+        isinstance(
+            dataset_obj_from_file_scaffold.combined_train_valid_data, DD
+        ),
+        len(dataset_obj_from_file_scaffold.combined_train_valid_data.y)
+        == len(dataset_obj_from_file_scaffold.combined_train_valid_data.ids),
+    ]
     concat_train_valid = np.concatenate((orig_train.ids, orig_valid.ids))
     test_list.append((concat_train_valid == dataset_obj_from_file_scaffold.combined_train_valid_data.ids).all())
     test_list.append(len(orig_train.y) == len(orig_train.ids))
@@ -372,14 +401,18 @@ def test_get_split_metadata():
         split_strategy="train_valid_test", splitter="scaffold")
 
     out_dict = dataset_obj_from_file.get_split_metadata()
-    test_list = []
-    test_list.append(out_dict["Splitting"]["split_strategy"] == dataset_obj_from_file.params.split_strategy)
-    test_list.append(out_dict["Splitting"]["splitter"] == dataset_obj_from_file.params.splitter)
-    # TODO: num_folds does not match. Need to identify the difference in num_folds.
-    # test_list.append(out_dict["Splitting"]["num_folds"] == dataset_obj_from_file.splitting.num_folds)
-    test_list.append(out_dict["Splitting"]["split_valid_frac"] == dataset_obj_from_file.params.split_valid_frac)
-    test_list.append(out_dict["Splitting"]["split_test_frac"] == dataset_obj_from_file.params.split_test_frac)
-    test_list.append(out_dict["Splitting"]["split_uuid"] == dataset_obj_from_file.split_uuid)
+    test_list = [
+        out_dict["Splitting"]["split_strategy"]
+        == dataset_obj_from_file.params.split_strategy,
+        out_dict["Splitting"]["splitter"]
+        == dataset_obj_from_file.params.splitter,
+        out_dict["Splitting"]["split_valid_frac"]
+        == dataset_obj_from_file.params.split_valid_frac,
+        out_dict["Splitting"]["split_test_frac"]
+        == dataset_obj_from_file.params.split_test_frac,
+        out_dict["Splitting"]["split_uuid"]
+        == dataset_obj_from_file.split_uuid,
+    ]
     assert all(test_list)
     
     

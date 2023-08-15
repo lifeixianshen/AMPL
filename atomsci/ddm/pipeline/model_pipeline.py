@@ -113,10 +113,7 @@ class ModelPipeline:
 
         self.ds_client = None
         if params.datastore:
-            if ds_client is None:
-                self.ds_client = dsf.config_client()
-            else:
-                self.ds_client = ds_client
+            self.ds_client = dsf.config_client() if ds_client is None else ds_client
         # Check consistency of task parameters
         if type(params.response_cols) == str:
             params.response_cols = [params.response_cols]
@@ -136,22 +133,20 @@ class ModelPipeline:
 
         self.perf_dict = {}
         if self.params.prediction_type == 'regression':
-            if self.params.num_model_tasks > 1:
-                self.metric_type = 'mean-r2_score'
-            else:
-                self.metric_type = 'r2_score'
+            self.metric_type = (
+                'mean-r2_score' if self.params.num_model_tasks > 1 else 'r2_score'
+            )
+        elif self.params.num_model_tasks > 1:
+            self.metric_type = 'mean-roc_auc_score'
         else:
-            if self.params.num_model_tasks > 1:
-                self.metric_type = 'mean-roc_auc_score'
-            else:
-                self.metric_type = 'roc_auc_score'
+            self.metric_type = 'roc_auc_score'
         if self.params.output_dir is None:
-            self.params.output_dir = os.path.join(self.params.result_dir, self.params.dataset_name, '%s_%s_%s_%s' %
-                                                  (
-                                                    self.params.model_type,
-                                                      self.params.featurizer,
-                                                      self.params.splitter, self.params.prediction_type),
-                                                  self.params.model_uuid)
+            self.params.output_dir = os.path.join(
+                self.params.result_dir,
+                self.params.dataset_name,
+                f'{self.params.model_type}_{self.params.featurizer}_{self.params.splitter}_{self.params.prediction_type}',
+                self.params.model_uuid,
+            )
         if not os.path.isdir(self.params.output_dir):
             os.makedirs(self.params.output_dir, exist_ok=True)
         self.output_dir = self.params.output_dir
@@ -291,7 +286,9 @@ class ModelPipeline:
                     with open(out_file, 'w') as out:
                         json.dump(self.model_metadata, out, sort_keys=True, indent=4, separators=(',', ': '))
                         out.write("\n")
-                    self.log.warning('Had to write model metadata to file %s because tracker failed' % out_file)
+                    self.log.warning(
+                        f'Had to write model metadata to file {out_file} because tracker failed'
+                    )
                     retry = False
         else:
             # If save_results is false, save the model metadata to a JSON file
@@ -299,7 +296,7 @@ class ModelPipeline:
             with open(out_file, 'w') as out:
                 json.dump(self.model_metadata, out, sort_keys=True, indent=4, separators=(',', ': '))
                 out.write("\n")
-            self.log.warning('Wrote model metadata to file %s' % out_file)
+            self.log.warning(f'Wrote model metadata to file {out_file}')
         self.model_wrapper._clean_up_excess_files(self.model_wrapper.model_dir)
         '''
         for root, dirs, files in os.walk(self.params.result_dir):
@@ -324,7 +321,7 @@ class ModelPipeline:
             dataset_metadata = dsf.get_keyval(dataset_key=self.params.dataset_key, bucket=self.params.bucket)
         else:
             dataset_metadata = {}
-        prediction_metadata = dict(
+        return dict(
             time_run=time.time(),
             model_uuid=self.params.model_uuid,
             dataset_key=self.params.dataset_key,
@@ -334,9 +331,8 @@ class ModelPipeline:
             smiles_col=self.params.smiles_col,
             response_cols=self.params.response_cols,
             PredictionResults=prediction_results,
-            DatasetMetadata=dataset_metadata
+            DatasetMetadata=dataset_metadata,
         )
-        return prediction_metadata
 
     # ****************************************************************************************
 
@@ -383,21 +379,23 @@ class ModelPipeline:
                     if prefix is None:
                         out_file = os.path.join(self.output_dir, 'model_metrics.json')
                     else:
-                        out_file = os.path.join(self.output_dir, '%s_model_metrics.json' % prefix)
+                        out_file = os.path.join(self.output_dir, f'{prefix}_model_metrics.json')
                     with open(out_file, 'w') as out:
                         json.dump(model_metrics, out, sort_keys=True, indent=4, separators=(',', ': '))
                         out.write("\n")
-                    self.log.warning('Had to write model metrics to file %s because tracker failed' % out_file)
+                    self.log.warning(
+                        f'Had to write model metrics to file {out_file} because tracker failed'
+                    )
                     retry = False
         else:
             if prefix is None:
                 out_file = os.path.join(self.output_dir, 'model_metrics.json')
             else:
-                out_file = os.path.join(self.output_dir, '%s_model_metrics.json' % prefix)
+                out_file = os.path.join(self.output_dir, f'{prefix}_model_metrics.json')
             with open(out_file, 'w') as out:
                 json.dump(model_metrics, out, sort_keys=True, indent=4, separators=(',', ': '))
                 out.write("\n")
-            self.log.warning('Wrote model metrics to file %s' % out_file)
+            self.log.warning(f'Wrote model metrics to file {out_file}')
             '''
             for root, dirs, files in os.walk(self.params.result_dir):
                 for d in dirs:
@@ -499,7 +497,7 @@ class ModelPipeline:
         # in the model tracker DB
         model_metrics = dict(model_uuid=self.params.model_uuid)
         model_metrics['ModelMetrics'] = dict(PredictionRuns=prediction_metadata)
-        self.save_metrics(model_metrics, 'prediction_%s' % self.params.dataset_name)
+        self.save_metrics(model_metrics, f'prediction_{self.params.dataset_name}')
 
     # ****************************************************************************************
     def predict_on_dataframe(self, dset_df, is_featurized=False, contains_responses=False):
@@ -667,7 +665,7 @@ class ModelPipeline:
                 for i, col in enumerate(dset_params.response_cols):
                     coldict[col] = self.params.response_cols[i]
             dset_df = dset_df.rename(columns=coldict)
-                        
+
         self.data = model_datasets.create_minimal_dataset(self.params, self.featurization, contains_responses)
 
         if not self.data.get_dataset_tasks(dset_df):
@@ -683,22 +681,22 @@ class ModelPipeline:
 
         if contains_responses:
             for i, colname in enumerate(self.params.response_cols):
-                result_df["%s_actual" % colname] = self.data.vals[:,i]
+                result_df[f"{colname}_actual"] = self.data.vals[:,i]
         for i, colname in enumerate(self.params.response_cols):
             if self.params.prediction_type == 'regression':
-                result_df["%s_pred" % colname] = preds[:,i,0]
+                result_df[f"{colname}_pred"] = preds[:,i,0]
             else:
                 class_probs = preds[:,i,:]
                 nclass = preds.shape[2]
                 if nclass == 2:
-                    result_df["%s_prob" % colname] = class_probs[:,1]
+                    result_df[f"{colname}_prob"] = class_probs[:,1]
                 else:
                     for k in range(nclass):
                         result_df["%s_prob_%d" % (colname, k)] = class_probs[:,k]
-                result_df["%s_pred" % colname] = np.argmax(class_probs, axis=1)
+                result_df[f"{colname}_pred"] = np.argmax(class_probs, axis=1)
         if self.params.uncertainty and self.params.prediction_type == 'regression':
             for i, colname in enumerate(self.params.response_cols):
-                std_colname = '%s_std' % colname
+                std_colname = f'{colname}_std'
                 result_df[std_colname] = stds[:,i,0]
 
         return result_df
@@ -724,17 +722,17 @@ def run_models(params, shared_featurization=None, generator=False):
         raise Exception('mlmt_client failed to instantitate')
     models = list(trkr.get_models(params.model_filter, client_wrapper,
                                   collection_name=params.collection_name))
-    if models == []:
+    if not models:
         print("No matching models returned")
         return
     for metadata_dict in models:
         model_uuid = metadata_dict['model_uuid']
 
-        print("Got metadata for model UUID %s" % model_uuid)
+        print(f"Got metadata for model UUID {model_uuid}")
 
         # Parse the saved model metadata to obtain the parameters used to train the model
         model_params = parse.wrapper(metadata_dict['ModelMetadata'])
-        print("Featurizer = %s" % model_params.featurizer)
+        print(f"Featurizer = {model_params.featurizer}")
 
         # Override selected model training data parameters with parameters for current dataset
 
@@ -767,7 +765,7 @@ def run_models(params, shared_featurization=None, generator=False):
         else:
             featurization = shared_featurization
 
-        print("Featurization = %s" % str(featurization))
+        print(f"Featurization = {str(featurization)}")
         # Create a ModelPipeline object
         pipeline = ModelPipeline(model_params, ds_client, client_wrapper)
 
@@ -781,7 +779,7 @@ def run_models(params, shared_featurization=None, generator=False):
         model_dir = dsf.retrieve_dataset_by_dataset_oid(model_dataset_oid, client=ds_client, return_metadata=False,
                                                         nrows=None, print_metadata=False, sep=False,
                                                         tarpath=pipeline.model_wrapper.model_dir)
-        pipeline.log.info("Extracted model tarball to %s" % model_dir)
+        pipeline.log.info(f"Extracted model tarball to {model_dir}")
 
         # If that worked, reload the saved model training state
         pipeline.model_wrapper.reload_model(pipeline.model_wrapper.model_dir)
@@ -827,9 +825,9 @@ def regenerate_results(result_dir, params=None, metadata_dict=None, shared_featu
             return
         metadata_dict = trkr.get_metadata_by_uuid(params.model_uuid, client_wrapper,
                                                collection_name=params.collection_name)
-        if metadata_dict is None:
-            print("No matching models returned")
-            return
+    if metadata_dict is None:
+        print("No matching models returned")
+        return
 
     # Parse the saved model metadata to obtain the parameters used to train the model
     model_params = parse.wrapper(metadata_dict['ModelMetadata'])
@@ -841,7 +839,7 @@ def regenerate_results(result_dir, params=None, metadata_dict=None, shared_featu
 
     model_uuid = model_params.model_uuid
 
-    print("Got metadata for model UUID %s" % model_uuid)
+    print(f"Got metadata for model UUID {model_uuid}")
 
     model_params.result_dir = result_dir
 
@@ -863,7 +861,7 @@ def regenerate_results(result_dir, params=None, metadata_dict=None, shared_featu
     else:
         featurization = shared_featurization
 
-    print("Featurization = %s" % str(featurization))
+    print(f"Featurization = {str(featurization)}")
     # Create the ModelWrapper object.
 
     pipeline.model_wrapper = model_wrapper.create_model_wrapper(pipeline.params, featurization,
@@ -876,7 +874,7 @@ def regenerate_results(result_dir, params=None, metadata_dict=None, shared_featu
                                                     tarpath=pipeline.model_wrapper.model_dir)
 
     # pipeline.log.info("Extracted model tarball to %s" % model_dir)
-    print("Extracted model tarball to %s" % model_dir)
+    print(f"Extracted model tarball to {model_dir}")
 
     # If that worked, reload the saved model training state
 
@@ -925,18 +923,22 @@ def create_prediction_pipeline(params, model_uuid, collection_name, featurizatio
     model_filter = dict(model_uuid=model_uuid)
     models = list(trkr.get_models(model_filter, client_wrapper,
                                   collection_name=collection_name))
-    if len(models) == 0:
-        raise Exception("No model found with UUID %s in collection %s" % (model_uuid, collection_name))
+    if not models:
+        raise Exception(
+            f"No model found with UUID {model_uuid} in collection {collection_name}"
+        )
     elif len(models) > 1:
         # This can't happen, but check anyway
-        raise Exception("Multiple models with UUID %s in collection %s" % (model_uuid, collection_name))
+        raise Exception(
+            f"Multiple models with UUID {model_uuid} in collection {collection_name}"
+        )
     metadata_dict = models[0]
 
-    print("Got metadata for model UUID %s" % model_uuid)
+    print(f"Got metadata for model UUID {model_uuid}")
 
     # Parse the saved model metadata to obtain the parameters used to train the model
     model_params = parse.wrapper(metadata_dict['ModelMetadata'])
-    print("Featurizer = %s" % model_params.featurizer)
+    print(f"Featurizer = {model_params.featurizer}")
 
     # Override selected model training data parameters with parameters for current dataset
 
@@ -967,7 +969,7 @@ def create_prediction_pipeline(params, model_uuid, collection_name, featurizatio
     if featurization is None:
         featurization = feat.create_featurization(model_params)
 
-    print("Featurization = %s" % str(featurization))
+    print(f"Featurization = {str(featurization)}")
     # Create a ModelPipeline object
     pipeline = ModelPipeline(model_params, ds_client, client_wrapper)
 
@@ -986,7 +988,7 @@ def create_prediction_pipeline(params, model_uuid, collection_name, featurizatio
     model_dir = dsf.retrieve_dataset_by_dataset_oid(model_dataset_oid, client=ds_client, return_metadata=False,
                                                     nrows=None, print_metadata=False, sep=False,
                                                     tarpath=pipeline.model_wrapper.model_dir)
-    pipeline.log.info("Extracted model tarball to %s" % model_dir)
+    pipeline.log.info(f"Extracted model tarball to {model_dir}")
 
     # If that worked, reload the saved model training state
     pipeline.model_wrapper.reload_model(pipeline.model_wrapper.model_dir)

@@ -2,6 +2,7 @@
 Utility functions used for AMPL dataset curation and creation.
 """
 
+
 """ TOC:
 aggregate_assay_data(assay_df, value_col='VALUE_NUM', output_value_col=None,
                          label_actives=True,
@@ -35,9 +36,9 @@ from atomsci.ddm.utils.struct_utils import get_rdkit_smiles, base_smiles_from_sm
 feather_supported = True
 try:
     import feather
-except (ImportError, AttributeError, ModuleNotFoundError):
+except (ImportError, AttributeError):
     feather_supported = False
-    
+
 from rdkit import Chem
 from rdkit.Chem.Descriptors import MolWt
 
@@ -89,8 +90,7 @@ def replicate_rmsd(dset_df, smiles_col='base_rdkit_smiles', value_col='PIC50', r
         values = dset_df[dset_df[smiles_col] == smiles][value_col].values
         uniq_devs.extend(values - values.mean())
     uniq_devs = np.array(uniq_devs)
-    rmsd = np.sqrt(np.mean(uniq_devs ** 2))
-    return rmsd
+    return np.sqrt(np.mean(uniq_devs ** 2))
 
 # ******************************************************************************************************************************************
 def mle_censored_mean(cmpd_df, std_est, value_col='PIC50', relation_col='relation'):
@@ -134,7 +134,7 @@ def mle_censored_mean(cmpd_df, std_est, value_col='PIC50', relation_col='relatio
         # Then minimize it
         opt_res = minimize_scalar(loglik, method='brent')
         if not opt_res.success:
-            print('Likelihood maximization failed, message is: "%s"' % opt_res.message)
+            print(f'Likelihood maximization failed, message is: "{opt_res.message}"')
             mle_value = nan
         else:
             mle_value = opt_res.x
@@ -301,7 +301,7 @@ def filter_out_comments (values, values_cs, data):
 
 
 # ******************************************************************************************************************************************
-def get_rdkit_smiles_parent (data):
+def get_rdkit_smiles_parent(data):
     print ("")
 
     print ("Adding SMILES column 'rdkit_smiles_parent' with salts stripped...(may take a while)", flush=True)
@@ -316,11 +316,7 @@ def get_rdkit_smiles_parent (data):
     rdkit_smiles_parent = []
     for i in range (i_max):
         smile = data['rdkit_smiles'].iloc[i]
-        if type (smile) is float:
-            split = ''
-        else:
-            split = base_smiles_from_smiles (smile)
-
+        split = '' if type (smile) is float else base_smiles_from_smiles (smile)
         rdkit_smiles_parent.append (split)
 
     #  2. Add base smiles string (stripped smiles) to dataset
@@ -330,7 +326,7 @@ def get_rdkit_smiles_parent (data):
 
 
 # ******************************************************************************************************************************************
-def average_and_remove_duplicates (column, tolerance, list_bad_duplicates, data, max_stdev = 100000, compound_id='CMPD_NUMBER',smiles_col='rdkit_smiles_parent'):
+def average_and_remove_duplicates(column, tolerance, list_bad_duplicates, data, max_stdev = 100000, compound_id='CMPD_NUMBER',smiles_col='rdkit_smiles_parent'):
     """This while loop loops through until no'bad duplicates' are left.
     column - column with the value of interest
     tolerance - acceptable % difference between value and average
@@ -343,7 +339,7 @@ def average_and_remove_duplicates (column, tolerance, list_bad_duplicates, data,
     removed = []
     removed = pd.DataFrame(removed)
 
-    while i < 1 or bad_duplicates !=0 and not data.empty :
+    while i < 1 or bad_duplicates !=0 and not data.empty:
         #a. reset table if needed
         if i > 0:
             del data['VALUE_NUM_mean']
@@ -352,7 +348,7 @@ def average_and_remove_duplicates (column, tolerance, list_bad_duplicates, data,
             del data['Remove_BadDuplicate']
 
         # 1. Calculate mean of duplicates
-        unique_smiles = data.groupby(smiles_col) 
+        unique_smiles = data.groupby(smiles_col)
         VALUE_NUM_mean = unique_smiles[column].mean()
         VALUE_NUM_std = unique_smiles[column].std()
         temporary_data = pd.concat([VALUE_NUM_mean,VALUE_NUM_std],axis=1)
@@ -377,9 +373,9 @@ def average_and_remove_duplicates (column, tolerance, list_bad_duplicates, data,
         data = data[data.Remove_BadDuplicate != 1]
 
         removed = removed.append(to_remove)
-        i = i+1
+        i += 1
 
-        # 6. If bad duplicates were removed, loop back to step 'a.' to reset table & re-calc. If no bad duplicates, exit 'while loop'.
+            # 6. If bad duplicates were removed, loop back to step 'a.' to reset table & re-calc. If no bad duplicates, exit 'while loop'.
 
 
     #print results
@@ -502,14 +498,12 @@ def add_classification(low_limit, high_limit, source_column, data):
         source_column = the column heading of the values being compared against high/med/low criteria
     '''
 
+    low = 0
+    medium = 1
     if low_limit != high_limit:
-        low = 0
-        medium = 1
         high = 2
         print('low=', low, ' medium=', medium, 'high=', high)
     else:
-        low = 0
-        medium = 1
         high = 1
         print('low=', low, 'high=', high)
 
@@ -534,42 +528,36 @@ def add_binary_tertiary_classification(low_limit, high_limit, source_column, dat
         source_column = the column heading of the values being compared against high/med/low criteria
     '''
     
+    low = 0
+    medium = 1
+    high = 1
     if low_limit != high_limit:  #give binary and tertiary classification
-        low = 0
-        medium = 1
-        high = 1        
-        print('Classification - binary')
-        print('low=', low, 'high=', high)         
-        data['class_binary'] = np.where(data[source_column] < low_limit,low,"")
-        data['class_binary'] = np.where(data[source_column] >= low_limit,medium,data['class_binary'])
-        data['class_binary'] = np.where(data[source_column] >= high_limit,high,data['class_binary'])        
-        print(data.groupby('class_binary').class_binary.count()) 
-        print("")
-        
-        low = 0
-        medium = 1
-        high = 2        
-        print('Classification - tertiary')
-        print('low=', low, ' medium=', medium, 'high=', high)
-        data['class_tertiary'] = np.where(data[source_column] < low_limit,low,"")
-        data['class_tertiary'] = np.where(data[source_column] >= low_limit,medium,data['class_tertiary'])
-        data['class_tertiary'] = np.where(data[source_column] >= high_limit,high,data['class_tertiary'])
-        print(data.groupby('class_tertiary').class_tertiary.count()) 
-        print("")
-        
-    else:  #binary only
-        low = 0
-        medium = 1
-        high = 1 
         print('Classification - binary')
         print('low=', low, 'high=', high)
         data['class_binary'] = np.where(data[source_column] < low_limit,low,"")
         data['class_binary'] = np.where(data[source_column] >= low_limit,medium,data['class_binary'])
         data['class_binary'] = np.where(data[source_column] >= high_limit,high,data['class_binary'])
-        print(data.groupby('class_binary').class_binary.count()) 
+        print(data.groupby('class_binary').class_binary.count())
         print("")
-    
-    
+
+        low = 0
+        medium = 1
+        high = 2
+        print('Classification - tertiary')
+        print('low=', low, ' medium=', medium, 'high=', high)
+        data['class_tertiary'] = np.where(data[source_column] < low_limit,low,"")
+        data['class_tertiary'] = np.where(data[source_column] >= low_limit,medium,data['class_tertiary'])
+        data['class_tertiary'] = np.where(data[source_column] >= high_limit,high,data['class_tertiary'])
+        print(data.groupby('class_tertiary').class_tertiary.count())
+    else:  #binary only
+        print('Classification - binary')
+        print('low=', low, 'high=', high)
+        data['class_binary'] = np.where(data[source_column] < low_limit,low,"")
+        data['class_binary'] = np.where(data[source_column] >= low_limit,medium,data['class_binary'])
+        data['class_binary'] = np.where(data[source_column] >= high_limit,high,data['class_binary'])
+        print(data.groupby('class_binary').class_binary.count())
+    print("")
+
     return data
 
 # ******************************************************************************************************************************************

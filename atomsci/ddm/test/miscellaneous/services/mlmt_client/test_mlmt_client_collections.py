@@ -139,7 +139,7 @@ class TestCollectionsSuccess(object):
         }
         output = list(self.client_wrapper.get_metadata_generator(
             filter_dict=original_dict))
-        assert len(output) == 0
+        assert not output
         
     def test_get_collection_success(self):
         create_dicts_3(self.client_wrapper)
@@ -265,9 +265,13 @@ class TestCollectionsSuccess(object):
             else:
                 raise Exception('Invalid Keys={keys}'.format(
                     keys=str(d1.keys())))
-        check_collection(self.client_wrapper, {
-            'collection_name': COLLECTION_NAME + '_metrics'}, expected,
-                         sort_function=sort)
+
+        check_collection(
+            self.client_wrapper,
+            {'collection_name': f'{COLLECTION_NAME}_metrics'},
+            expected,
+            sort_function=sort,
+        )
 
 
 # https://docs.pytest.org/en/latest/getting-started.html for more on test
@@ -440,10 +444,9 @@ def check_collection_names(test_class, filter_dict, expected_collections,
     if substring is None:
         expected = sorted(expected_collections + test_class.initial_collections)
     else:
-        initial_collection_matches = []
-        for c in test_class.initial_collections:
-            if substring in c:
-                initial_collection_matches.append(c)
+        initial_collection_matches = [
+            c for c in test_class.initial_collections if substring in c
+        ]
         expected = sorted(expected_collections + initial_collection_matches)
     assert output['matching_collection_names'] == expected
 

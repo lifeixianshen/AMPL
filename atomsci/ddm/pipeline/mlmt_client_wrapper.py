@@ -498,7 +498,7 @@ class MLMTClientWrapper(object):
             keys.remove('collection_name')
         except ValueError:
             raise MongoQueryException('collection_name is unspecified.')
-        if (keys != []) and (keys != ['test_internal_error']):
+        if keys not in [[], ['test_internal_error']]:
             raise MongoQueryException('Invalid keys={keys}'.format(keys=keys))
         collection_name = filter_dict['collection_name']
         if '_metrics' in collection_name:
@@ -794,7 +794,7 @@ def get_generator(mlmt_client, filter_dict, log=False):
             ids = list(map(lambda d: d['_id'], output['ids']))
             if log:
                 print('get_generator: ids={ids}.'.format(ids=ids))
-            if ids == []:
+            if not ids:
                 # Stop generator.
                 break
             if len(ids) > limit:
@@ -826,8 +826,7 @@ def get_generator(mlmt_client, filter_dict, log=False):
                         errors=id_filter_output['errors']
                     )
                 )
-            item = id_filter_output['item']
-            yield item
+            yield id_filter_output['item']
             # Move up the list
             ids.pop(0)
         if already_have_ids:

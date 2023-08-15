@@ -936,7 +936,7 @@ class TestMetricsFailure(object):
                 'TrainingRun' : {}
             }
         }
-        collection_name = COLLECTION_NAME + '_metrics'
+        collection_name = f'{COLLECTION_NAME}_metrics'
         errors = ('Status400Exception: collection_name={collection_name}'
                   ' contains the word "metrics". collection_name + "_metrics" '
                   'is automatically used to store metrics.'

@@ -69,14 +69,12 @@ def calc_dist_mat(feat1, feat2, metric, pool, num_workers):
     """
     Calculate distance matrix between rows of feat1 and rows of feat2
     """
-    if (num_workers > 1 ) :
-        interval, remainder = divmod( len(feat1), min( len(feat1), num_workers-1 ) )
-        interval = max( interval, 1 )
-        chunks = pool.map( Cdist, [ (feat1[r:min(r+interval, len(feat1) ) ], feat2, metric) for r in range( 0, len(feat1), interval ) ] ) 
-        dist_mat = np.vstack( chunks ) 
-    else :
-        dist_mat = cdist( feat1, feat2, metric )
-    return dist_mat
+    if num_workers <= 1:
+        return cdist( feat1, feat2, metric )
+    interval, remainder = divmod( len(feat1), min( len(feat1), num_workers-1 ) )
+    interval = max( interval, 1 )
+    chunks = pool.map( Cdist, [ (feat1[r:min(r+interval, len(feat1) ) ], feat2, metric) for r in range( 0, len(feat1), interval ) ] )
+    return np.vstack( chunks )
 
 
 #*******************************************************************************************************************************************

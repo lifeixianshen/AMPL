@@ -84,14 +84,14 @@ def set_group_permissions(system, path, data_owner='gsk', data_owner_group='gskc
     if system != 'LC':
         system = 'AD'
 
-    owner_group_map = dict(gsk={'LC': 'gskcraa', 'AD': 'gskusers-ad'},
-                           public={'LC': 'atom', 'AD': 'atom'})
-
     if data_owner == 'username':
         group = getpass.getuser()
     elif data_owner == 'data_owner_group':
         group = data_owner_group
     else:
+        owner_group_map = dict(gsk={'LC': 'gskcraa', 'AD': 'gskusers-ad'},
+                               public={'LC': 'atom', 'AD': 'atom'})
+
         group = owner_group_map[data_owner][system]
 
     path_metadata = Path(path)
@@ -155,7 +155,7 @@ def create_split_dataset_from_metadata(model_metadata, ds_client, save_file=Fals
     if save_file:
         shortened_key = dset_key.rstrip('.csv')
         res_path = '/ds/projdata/gsk_data/split_joined_datasets'
-        filename = '%s_%s_%s_split_dataset.csv' % (shortened_key, split_uuid, model_metadata.splitter)
+        filename = f'{shortened_key}_{split_uuid}_{model_metadata.splitter}_split_dataset.csv'
         joined_dataset.to_csv(os.path.join(res_path, filename), index=False)
     return joined_dataset
 
@@ -176,7 +176,7 @@ def save_joined_dataset(joined_dataset, split_metadata):
     dset_key = split_metadata['dataset_key']
     split_uuid = split_metadata['metadata']['split_uuid']
     res_path = '/ds/projdata/gsk_data/split_joined_datasets'
-    filename = '%s_%s_split_dataset.csv' % (dset_key, split_uuid)
+    filename = f'{dset_key}_{split_uuid}_split_dataset.csv'
     joined_dataset.to_csv(os.path.join(res_path, filename), index=False)
     '''
     title = 'Joined dataset for dataset %s and split UUID %s' % (dset_key, split_uuid)
@@ -264,8 +264,8 @@ class ModelDataset(object):
 
         if self.params.previously_split and self.params.split_uuid is None:
             raise Exception(
-                    "previously_split is set to True but no split_uuid provided for dataset {}".
-                    format(self.dataset_name))
+                f"previously_split is set to True but no split_uuid provided for dataset {self.dataset_name}"
+            )
         if not self.params.previously_split and self.params.split_uuid is not None:
             self.log.info("previously_split is set False; ignoring split_uuid passed as parameter")
             self.params.split_uuid = None
@@ -306,11 +306,13 @@ class ModelDataset(object):
 
         """
         if not self.get_dataset_tasks(dset_df):
-            raise Exception("Unable to determine prediction tasks for dataset %s" % self.dataset_name)
-        missing_tasks = list(set(self.tasks) - set(dset_df.columns.values))
-        if len(missing_tasks) > 0:
-            raise Exception("Requested prediction task columns %s are missing from dataset %s" % (
-                ", ".join(missing_tasks), self.dataset_name))
+            raise Exception(
+                f"Unable to determine prediction tasks for dataset {self.dataset_name}"
+            )
+        if missing_tasks := list(set(self.tasks) - set(dset_df.columns.values)):
+            raise Exception(
+                f'Requested prediction task columns {", ".join(missing_tasks)} are missing from dataset {self.dataset_name}'
+            )
 
     # ****************************************************************************************
     def load_featurized_data(self):
@@ -348,20 +350,25 @@ class ModelDataset(object):
                 self.n_features = self.featurization.get_feature_count()
                 self.log.debug("Creating deepchem dataset")
                 self.dataset = DiskDataset.from_numpy(features, self.vals, ids=ids, verbose=False)
-                self.log.info("Using prefeaturized data; number of features = " + str(self.n_features))
+                self.log.info(
+                    f"Using prefeaturized data; number of features = {str(self.n_features)}"
+                )
                 return
             except Exception as e:
                 self.log.debug("Exception when trying to load featurized data:\n%s" % str(e))
-                self.log.info("Featurized dataset not previously saved for dataset %s, creating new" % self.dataset_name)
-                pass
+                self.log.info(
+                    f"Featurized dataset not previously saved for dataset {self.dataset_name}, creating new"
+                )
         else:
-            self.log.info("Creating new featurized dataset for dataset %s" % self.dataset_name)
+            self.log.info(
+                f"Creating new featurized dataset for dataset {self.dataset_name}"
+            )
         dset_df = self.load_full_dataset()
         self.check_task_columns(dset_df)
         features, ids, self.vals, self.attr, w = self.featurization.featurize_data(dset_df, self)
         self.n_features = self.featurization.get_feature_count()
-        print("number of features: " + str(self.n_features))
-           
+        print(f"number of features: {str(self.n_features)}")
+
         # Create the DeepChem dataset       
         self.dataset = DiskDataset.from_numpy(features, self.vals, ids=ids, w=w, verbose=False)
         # Checking for minimum number of rows
@@ -416,12 +423,14 @@ class ModelDataset(object):
         if self.splitting is None:
             self.splitting = split.create_splitting(self.params)
         self.train_valid_dsets, self.test_dset, self.train_valid_attr, self.test_attr = \
-            self.splitting.split_dataset(self.dataset, self.attr, self.params.smiles_col)
+                self.splitting.split_dataset(self.dataset, self.attr, self.params.smiles_col)
         if self.train_valid_dsets is None:
-            raise Exception("Dataset %s did not split properly" % self.dataset_name)
+            raise Exception(f"Dataset {self.dataset_name} did not split properly")
         if self.params.prediction_type == 'classification':
             if not self._check_classes():
-                raise Exception("Dataset {} does not have all classes represented in a split".format(self.dataset_name))
+                raise Exception(
+                    f"Dataset {self.dataset_name} does not have all classes represented in a split"
+                )
 
     # ****************************************************************************************
 
@@ -436,9 +445,7 @@ class ModelDataset(object):
             if np.all(train.y == train.y[0]) or np.all(valid.y == valid.y[0]):
                 return False
         tmp_y = self.test_dset.y
-        if np.all(tmp_y == tmp_y[0]):
-            return False
-        return True
+        return not np.all(tmp_y == tmp_y[0])
 
     # ****************************************************************************************
 
@@ -498,8 +505,7 @@ class ModelDataset(object):
         subsets += ['test'] * ntest
         folds += [0] * ntest
 
-        split_df = pd.DataFrame(dict(cmpd_id=ids, subset=subsets, fold=folds))
-        return split_df
+        return pd.DataFrame(dict(cmpd_id=ids, subset=subsets, fold=folds))
 
     # ****************************************************************************************
     def load_presplit_dataset(self, directory=None):
@@ -545,8 +551,9 @@ class ModelDataset(object):
             for param in split.split_params:
                 if param in split_kv:
                     if self.params.__dict__[param] != split_kv[param]:
-                        self.log.warning("Warning: %s = %s in split table, %s in model params; using split table value." %
-                                         (param, str(split_kv[param]), str(self.params.__dict__[param])))
+                        self.log.warning(
+                            f"Warning: {param} = {str(split_kv[param])} in split table, {str(self.params.__dict__[param])} in model params; using split table value."
+                        )
                         self.params.__dict__[param] = split_kv[param]
 
         # Create object to delegate splitting to.
@@ -641,7 +648,7 @@ class ModelDataset(object):
             elif subset == 'test':
                 dataset = self.test_dset
             else:
-                raise ValueError('Unknown dataset subset type "%s"' % subset)
+                raise ValueError(f'Unknown dataset subset type "{subset}"')
 
             y = dc.trans.undo_transforms(dataset.y, transformers)
             w = dataset.w
@@ -754,23 +761,22 @@ class MinimalDataset(ModelDataset):
             feature_cols = [dset_df[col].values.reshape(-1,1) for col in self.featurization.get_feature_columns()]
             features = np.concatenate(feature_cols, axis=1)
             ids = dset_df[params.id_col].values
-            #TODO: check size is right
-            nrows = len(ids)
-            ncols = len(params.response_cols)
             if self.contains_responses:
                 self.vals = dset_df[params.response_cols].values
             else:
+                #TODO: check size is right
+                nrows = len(ids)
+                ncols = len(params.response_cols)
                 self.vals = np.zeros((nrows,ncols))
             self.attr = pd.DataFrame({params.smiles_col: dset_df[params.smiles_col].values},
                                  index=dset_df[params.id_col])
-            self.log.warning("Done")
         else:
             self.log.warning("Featurizing data...")
             #JEA
             features, ids, self.vals, self.attr, _ = self.featurization.featurize_data(dset_df, self)
-            self.log.warning("Done")
+        self.log.warning("Done")
         self.n_features = self.featurization.get_feature_count()
-        print("number of features: " + str(self.n_features))
+        print(f"number of features: {str(self.n_features)}")
         # Create the DeepChem dataset
         # TODO: Try this with NumpyDataset instead. It may require special handling in ModelWrapper
         # classes, because NumpyDataset.y has different dimensionality than DiskDataset.y for the
@@ -849,10 +855,7 @@ class DatastoreDataset(ModelDataset):
             self.dataset_name = params.dataset_name
         else:
             self.dataset_name = os.path.basename(self.params.dataset_key).replace('.csv', '')
-        if ds_client is None:
-            self.ds_client = dsf.config_client()
-        else:
-            self.ds_client = ds_client
+        self.ds_client = dsf.config_client() if ds_client is None else ds_client
 
     # ****************************************************************************************
     def load_full_dataset(self):
@@ -871,9 +874,9 @@ class DatastoreDataset(ModelDataset):
         self.dataset_oid = dataset_metadata['dataset_oid']
 
         if dset_df is None:
-            raise Exception("Failed to load dataset %s" % self.dataset_key)
+            raise Exception(f"Failed to load dataset {self.dataset_key}")
         if dset_df.empty:
-            raise Exception("Dataset %s is empty" % self.dataset_key)
+            raise Exception(f"Dataset {self.dataset_key} is empty")
         return dset_df
 
     # ****************************************************************************************
@@ -893,24 +896,25 @@ class DatastoreDataset(ModelDataset):
         """
         if super().get_dataset_tasks(dset_df):
             return True
-        else:
-            # If not specified by user, get tasks from dataset info
-            try:
-                dataset_info = self.ds_client.ds_datasets.get_bucket_dataset(bucket_name=self.params.bucket,
-                                                                             dataset_key=self.dataset_key).result()
-                keyval_dict = key_value_list_to_dict(dataset_info['metadata'])
-                task_name = keyval_dict['task_name']
-                self.tasks = [task_name]
-                return True
-            except Exception:
-                # Try to guess tasks from data frame columns, assuming that tasks are anything that doesn't look
-                # like a compound ID, SMILES string, other compound identifier, or feature
-                non_task_cols = {'compound_id', 'rdkit_smiles', self.params.id_col, self.params.smiles_col, 'inchi_key',
-                                 'inchi_string', 'smiles', 'smiles_out', 'lost_frags'} | set(
-                    self.featurization.get_feature_columns())
-                self.tasks = sorted(set(dset_df.columns.values) - non_task_cols)
+        # If not specified by user, get tasks from dataset info
+        try:
+            dataset_info = self.ds_client.ds_datasets.get_bucket_dataset(bucket_name=self.params.bucket,
+                                                                         dataset_key=self.dataset_key).result()
+            keyval_dict = key_value_list_to_dict(dataset_info['metadata'])
+            task_name = keyval_dict['task_name']
+            self.tasks = [task_name]
+            return True
+        except Exception:
+            # Try to guess tasks from data frame columns, assuming that tasks are anything that doesn't look
+            # like a compound ID, SMILES string, other compound identifier, or feature
+            non_task_cols = {'compound_id', 'rdkit_smiles', self.params.id_col, self.params.smiles_col, 'inchi_key',
+                             'inchi_string', 'smiles', 'smiles_out', 'lost_frags'} | set(
+                self.featurization.get_feature_columns())
+            self.tasks = sorted(set(dset_df.columns.values) - non_task_cols)
         if self.tasks is None or not self.tasks:
-            self.log.error("Unable to determine prediction task(s) for dataset %s" % self.dataset_name)
+            self.log.error(
+                f"Unable to determine prediction task(s) for dataset {self.dataset_name}"
+            )
             return False
         return True
 
@@ -944,17 +948,18 @@ class DatastoreDataset(ModelDataset):
         tag_list = dataset_info['tags']
         tag_list += ['prefeaturized', self.dataset_name.lower(), self.params.featurizer.lower()]
 
-        dataset_metadata = dsf.upload_df_to_DS(featurized_dset_df,
-                           bucket=self.params.bucket,
-                           filename=featurized_dset_key,
-                           title=featurized_dset_key.replace('_', ' '),
-                           description='Data from dataset %s featurized with %s' % (
-                           self.dataset_name, str(self.featurization)),
-                           tags=tag_list,
-                           key_values=keyval_dict,
-                           client=self.ds_client,
-                           dataset_key=featurized_dset_key,
-                           return_metadata=True)
+        dataset_metadata = dsf.upload_df_to_DS(
+            featurized_dset_df,
+            bucket=self.params.bucket,
+            filename=featurized_dset_key,
+            title=featurized_dset_key.replace('_', ' '),
+            description=f'Data from dataset {self.dataset_name} featurized with {str(self.featurization)}',
+            tags=tag_list,
+            key_values=keyval_dict,
+            client=self.ds_client,
+            dataset_key=featurized_dset_key,
+            return_metadata=True,
+        )
         # Set the OID for the featurized dataset
         self.dataset_oid = dataset_metadata['dataset_oid']
 
@@ -983,8 +988,9 @@ class DatastoreDataset(ModelDataset):
         metadata = dsf.retrieve_dataset_by_datasetkey(self.params.dataset_key, self.params.bucket,
                                                       self.ds_client, return_metadata=True)
         if 'prefeaturized' in metadata['tags']:
-            self.log.debug("Loading prefeaturized dataset from key %s, bucket %s" % (
-                           self.params.dataset_key, self.params.bucket))
+            self.log.debug(
+                f"Loading prefeaturized dataset from key {self.params.dataset_key}, bucket {self.params.bucket}"
+            )
             featurized_dset_df = dsf.retrieve_dataset_by_datasetkey(self.params.dataset_key, 
                                                                     self.params.bucket, 
                                                                     self.ds_client)
@@ -996,7 +1002,9 @@ class DatastoreDataset(ModelDataset):
         # Otherwise, look it up by key and bucket
         featurized_dset_name = self.featurization.get_featurized_dset_name(self.dataset_name)
         featurized_dset_key = os.path.join(os.path.dirname(self.params.dataset_key), featurized_dset_name)
-        self.log.debug("Looking up prefeaturized dataset at key %s, bucket %s" % (featurized_dset_key, self.params.bucket))
+        self.log.debug(
+            f"Looking up prefeaturized dataset at key {featurized_dset_key}, bucket {self.params.bucket}"
+        )
         featurized_dset_df = dsf.retrieve_dataset_by_datasetkey(featurized_dset_key, self.params.bucket, self.ds_client)
         self.dataset_key = featurized_dset_key
 
@@ -1028,20 +1036,22 @@ class DatastoreDataset(ModelDataset):
 
         tag_list = ['split_table']
 
-        dsf.upload_df_to_DS(split_df,
-                           bucket=self.params.bucket,
-                           filename=split_table_key,
-                           title="Split table %s" % split_table_key.replace('_', ' '),
-                           description='Dataset %s %s split compound assignment table' % (
-                                        self.dataset_name, self.splitting.get_split_prefix()),
-                           tags=tag_list,
-                           key_values=keyval_dict,
-                           client=self.ds_client,
-                           dataset_key=split_table_key)
+        dsf.upload_df_to_DS(
+            split_df,
+            bucket=self.params.bucket,
+            filename=split_table_key,
+            title=f"Split table {split_table_key.replace('_', ' ')}",
+            description=f'Dataset {self.dataset_name} {self.splitting.get_split_prefix()} split compound assignment table',
+            tags=tag_list,
+            key_values=keyval_dict,
+            client=self.ds_client,
+            dataset_key=split_table_key,
+        )
         print("save split info",split_table_key,self.params.bucket,self.split_uuid)
-        self.log.info('Dataset split_uuid = %s' % self.split_uuid)
-        self.log.info('Dataset split table saved to datastore bucket %s with dataset_key %s' % (self.params.bucket,
-                      split_table_key))
+        self.log.info(f'Dataset split_uuid = {self.split_uuid}')
+        self.log.info(
+            f'Dataset split table saved to datastore bucket {self.params.bucket} with dataset_key {split_table_key}'
+        )
 
     # ****************************************************************************************
     def load_dataset_split_table(self, directory=None):
@@ -1146,13 +1156,13 @@ class FileDataset(ModelDataset):
         """
         dataset_path = self.params.dataset_key
         if not os.path.exists(dataset_path):
-            raise Exception("Dataset file %s does not exist" % dataset_path)
+            raise Exception(f"Dataset file {dataset_path} does not exist")
         dset_df = pd.read_csv(dataset_path)
 
         if dset_df is None:
-            raise Exception("Failed to load dataset %s" % dataset_path)
+            raise Exception(f"Failed to load dataset {dataset_path}")
         if dset_df.empty:
-            raise Exception("Dataset %s is empty" % dataset_path)
+            raise Exception(f"Dataset {dataset_path} is empty")
 
         return dset_df
 
@@ -1174,15 +1184,16 @@ class FileDataset(ModelDataset):
         """
         if super().get_dataset_tasks(dset_df):
             return True
-        else:
-            # Guess: Tasks are anything that doesn't look like a compound ID, SMILES string, other compound identifier,
-            # or feature
-            non_task_cols = {'compound_id', 'rdkit_smiles', self.params.id_col, self.params.smiles_col, 'inchi_key',
-                             'inchi_string', 'smiles', 'smiles_out', 'lost_frags'} | set(
-                self.featurization.get_feature_columns())
-            self.tasks = sorted(set(dset_df.columns.values) - non_task_cols)
+        # Guess: Tasks are anything that doesn't look like a compound ID, SMILES string, other compound identifier,
+        # or feature
+        non_task_cols = {'compound_id', 'rdkit_smiles', self.params.id_col, self.params.smiles_col, 'inchi_key',
+                         'inchi_string', 'smiles', 'smiles_out', 'lost_frags'} | set(
+            self.featurization.get_feature_columns())
+        self.tasks = sorted(set(dset_df.columns.values) - non_task_cols)
         if self.tasks is None or not self.tasks:
-            self.log.error("Unable to determine prediction task(s) for dataset %s" % self.dataset_name)
+            self.log.error(
+                f"Unable to determine prediction task(s) for dataset {self.dataset_name}"
+            )
             return False
         return True
 
@@ -1249,7 +1260,7 @@ class FileDataset(ModelDataset):
         split_table_file = '{0}/{1}'.format(directory, self._get_split_key())
         split_df.to_csv(split_table_file, index=False)
 
-        self.log.warning('Dataset split table saved to %s' % split_table_file)
+        self.log.warning(f'Dataset split table saved to {split_table_file}')
 
     # ****************************************************************************************
     def load_dataset_split_table(self, directory=None):

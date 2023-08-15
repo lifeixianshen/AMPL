@@ -126,7 +126,7 @@ def reformat_filter_dict(filter_dict):
                             filter_dict[value][i] = int(item)
                         elif type(filter_val) == np.float64:
                             filter_dict[value][i] = float(item)
-                new_filter_dict['%s.%s' % (key, value)] = filter_dict[value]
+                new_filter_dict[f'{key}.{value}'] = filter_dict[value]
     return new_filter_dict
 
 
@@ -165,16 +165,16 @@ def permutate_NNlayer_combo_params(layer_nums, node_nums, dropout_list, max_fina
     # set to the smallest node_num in the provided list, if necessary.
     if node_nums[-1] > max_final_layer_size:
         max_final_layer_size = node_nums[-1]
-        
+
     for dropout in dropout_list:
         _repeated_layers =[]
         for layer_num in layer_nums:
             for layer in itertools.combinations(node_nums, layer_num):
-                layer = [i for i in layer]
+                layer = list(layer)
                 if (layer[-1] <= max_final_layer_size) and (layer not in _repeated_layers):
                     _repeated_layers.append(layer)
                     layer_sizes.append(layer)
-                    dropouts.append([(dropout) for i in layer])
+                    dropouts.append([dropout for _ in layer])
     return layer_sizes, dropouts
 
 
@@ -197,13 +197,12 @@ def get_num_params(combo):
     #TODO: Update for moe vs mordred
     if combo['featurizer'] == 'ecfp':
         return tmp_sum + layers[0]*1024
-    if combo['featurizer'] == 'descriptors':
-        if combo['descriptor_type'] == 'moe':
-            return tmp_sum + layers[0]*306
-        if combo['descriptor_type'] == 'mordred_filtered':
-            return tmp_sum + layers[0]*1555
-    else:
+    if combo['featurizer'] != 'descriptors':
         return tmp_sum
+    if combo['descriptor_type'] == 'moe':
+        return tmp_sum + layers[0]*306
+    if combo['descriptor_type'] == 'mordred_filtered':
+        return tmp_sum + layers[0]*1555
 
 
 # Global variable with keys that should not be used to generate hyperparameters
@@ -303,12 +302,10 @@ class HyperparameterSearch(object):
         for key, value in vars(self.params).items():
             if not value or key in self.excluded_keys:
                 continue
-            elif key == 'result_dir' or key == 'output_dir':
+            elif key in ['result_dir', 'output_dir']:
                 self.new_params[key] = os.path.join(value, self.hyperparam_uuid)
-            # Need to zip together layers in special way
             elif key in self.hyperparam_layers and type(value[0]) == list:
                 self.layers[key] = value
-            # Parses the hyperparameter keys depending on the size of the key list
             elif key in self.hyperparam_keys:
                 if type(value) != list:
                     self.new_params[key] = value
@@ -329,17 +326,15 @@ class HyperparameterSearch(object):
         if type(self.params.featurizer) == str:
             self.params.featurizer = [self.params.featurizer]
         for model_type in self.params.model_type:
-            if model_type == 'NN':
-                # if the model type is NN, loops through the featurizer to check for GraphConv.
-                for featurizer in self.params.featurizer:
+            for featurizer in self.params.featurizer:
+                if model_type == 'NN':
                     subcombo = {k: val for k, val in self.hyperparams.items() if k in
                                 self.hyperparam_keys - self.rf_specific_keys - self.xgboost_specific_keys}
                     # could put in list
                     subcombo['model_type'] = [model_type]
                     subcombo['featurizer'] = [featurizer]
                     self.param_combos.extend(self.generate_combos(subcombo))
-            elif model_type == 'RF':
-                for featurizer in self.params.featurizer:
+                elif model_type == 'RF':
                     if featurizer == 'graphconv':
                         continue
                     # Adds the subcombo for RF
@@ -348,8 +343,7 @@ class HyperparameterSearch(object):
                     subcombo['model_type'] = [model_type]
                     subcombo['featurizer'] = [featurizer]
                     self.param_combos.extend(self.generate_combos(subcombo))
-            elif model_type == 'xgboost':
-                for featurizer in self.params.featurizer:
+                elif model_type == 'xgboost':
                     if featurizer == 'graphconv':
                         continue
                     # Adds the subcombo for xgboost
@@ -372,11 +366,10 @@ class HyperparameterSearch(object):
         hyperparam_combos = []
         hyperparams = new_dict.keys()
         hyperparam_vals = new_dict.values()
-        for ind, hyperparameter_tuple in enumerate(itertools.product(*hyperparam_vals)):
-            model_params = {}
-            for hyperparam, hyperparam_val in zip(hyperparams, hyperparameter_tuple):
-                model_params[hyperparam] = hyperparam_val
-            hyperparam_combos.append(model_params)
+        hyperparam_combos.extend(
+            dict(zip(hyperparams, hyperparameter_tuple))
+            for hyperparameter_tuple in itertools.product(*hyperparam_vals)
+        )
         return hyperparam_combos
 
     def assemble_layers(self):
@@ -387,10 +380,8 @@ class HyperparameterSearch(object):
             None
         """
         tmp_list = []
-        for i in range(min([len(x) for x in list(self.layers.values())])):
-            tmp_dict = {}
-            for key, value in self.layers.items():
-                tmp_dict[key] = value[i]
+        for i in range(min(len(x) for x in list(self.layers.values()))):
+            tmp_dict = {key: value[i] for key, value in self.layers.items()}
             x = [len(y) for y in tmp_dict.values()]
             try:
                 assert x.count(x[0]) == len(x)
@@ -450,13 +441,15 @@ class HyperparameterSearch(object):
                 retry = False
             except Exception as e:
                 if i < 5:
-                    print("Could not get metadata from datastore for dataset %s because of exception %s, sleeping..."
-                            % (assay_params['dataset_key'], e))
+                    print(
+                        f"Could not get metadata from datastore for dataset {assay_params['dataset_key']} because of exception {e}, sleeping..."
+                    )
                     time.sleep(60)
                     i += 1
                 else:
-                    print("Could not get metadata from datastore for dataset %s because of exception %s, exiting"
-                            % (assay_params['dataset_key'], e))
+                    print(
+                        f"Could not get metadata from datastore for dataset {assay_params['dataset_key']} because of exception {e}, exiting"
+                    )
                     return None
         if 'id_col' in metadata.keys():
             assay_params['id_col'] = metadata['id_col']
@@ -532,19 +525,26 @@ class HyperparameterSearch(object):
                 retry = False
             except Exception as e:
                 if i < 5:
-                    print("Could not get metadata from datastore for dataset %s because of exception %s, sleeping..." % (dataset_key, e))
+                    print(
+                        f"Could not get metadata from datastore for dataset {dataset_key} because of exception {e}, sleeping..."
+                    )
                     time.sleep(60)
                     i += 1
                 else:
-                    print("Could not get metadata from datastore for dataset %s because of exception %s, exiting" % (dataset_key, e))
+                    print(
+                        f"Could not get metadata from datastore for dataset {dataset_key} because of exception {e}, exiting"
+                    )
                     return None
-        assay_params = {'dataset_key': dataset_key, 'bucket': bucket, 'splitter': splitter,
-                        'split_valid_frac': split_valid_frac, 'split_test_frac': split_test_frac}
-        #Need a featurizer type to split dataset, but since we only care about getting the split_uuid, does not matter which featurizer you use
-        if type(self.params.featurizer) == list:
-            assay_params['featurizer'] = self.params.featurizer[0]
-        else:
-            assay_params['featurizer'] = self.params.featurizer
+        assay_params = {
+            'dataset_key': dataset_key,
+            'bucket': bucket,
+            'splitter': splitter,
+            'split_valid_frac': split_valid_frac,
+            'split_test_frac': split_test_frac,
+            'featurizer': self.params.featurizer[0]
+            if type(self.params.featurizer) == list
+            else self.params.featurizer,
+        }
         if 'id_col' in metadata.keys():
             assay_params['id_col'] = metadata['id_col']
         if 'response_cols' not in assay_params or assay_params['response_cols'] is None:
@@ -583,11 +583,15 @@ class HyperparameterSearch(object):
                 return data.split_uuid
             except Exception as e:
                 if i < 5:
-                    print("Could not get metadata from datastore for dataset %s because of exception %s, sleeping" % (dataset_key, e))
+                    print(
+                        f"Could not get metadata from datastore for dataset {dataset_key} because of exception {e}, sleeping"
+                    )
                     time.sleep(60)
                     i += 1
                 else:
-                    print("Could not save split dataset for dataset %s because of exception %s" % (dataset_key, e))
+                    print(
+                        f"Could not save split dataset for dataset {dataset_key} because of exception {e}"
+                    )
                     return None
 
     def generate_split_shortlist(self):
@@ -607,13 +611,15 @@ class HyperparameterSearch(object):
                 retry = False
             except Exception as e:
                 if i < 5:
-                    print("Could not retrieve shortlist %s from datastore because of exception %s, sleeping..." %
-                          (self.params.shortlist_key, e))
+                    print(
+                        f"Could not retrieve shortlist {self.params.shortlist_key} from datastore because of exception {e}, sleeping..."
+                    )
                     time.sleep(60)
                     i += 1
                 else:
-                    print("Could not retrieve shortlist %s from datastore because of exception %s, exiting" %
-                          (self.params.shortlist_key, e))
+                    print(
+                        f"Could not retrieve shortlist {self.params.shortlist_key} from datastore because of exception {e}, exiting"
+                    )
                     return None
 
         datasets = self.get_shortlist_df()
@@ -627,15 +633,19 @@ class HyperparameterSearch(object):
                         split_uuids[split_name] = self.return_split_uuid(assay, bucket, splitter, split_combo)
                     except Exception as e:
                         print(e)
-                        print("Splitting failed for dataset %s" % assay)
+                        print(f"Splitting failed for dataset {assay}")
                         split_uuids[split_name] = None
                         continue
             rows.append(split_uuids)
         df = pd.DataFrame(rows)
-        new_metadata = {}
-        new_metadata['dataset_key'] = shortlist_metadata['dataset_key'].strip('.csv') + '_with_uuids.csv'
-        new_metadata['has_uuids'] = True
-        new_metadata['description'] = '%s, with UUIDs' % shortlist_metadata['description']
+        new_metadata = {
+            'dataset_key': shortlist_metadata['dataset_key'].strip('.csv')
+            + '_with_uuids.csv',
+            'has_uuids': True,
+        }
+        new_metadata[
+            'description'
+        ] = f"{shortlist_metadata['description']}, with UUIDs"
         retry = True
         i = 0
         while retry:
@@ -651,12 +661,12 @@ class HyperparameterSearch(object):
                 retry=False
             except Exception as e:
                 if i < 5:
-                    print("Could not save new shortlist because of exception %s, sleeping..." % e)
+                    print(f"Could not save new shortlist because of exception {e}, sleeping...")
                     time.sleep(60)
                     i += 1
                 else:
                     #TODO: Add save to disk.
-                    print("Could not save new shortlist because of exception %s, exiting" % e)
+                    print(f"Could not save new shortlist because of exception {e}, exiting")
                     retry = False
 
     def get_shortlist_df(self, split_uuids=False):
@@ -677,25 +687,26 @@ class HyperparameterSearch(object):
                     retry=False
                 except Exception as e:
                     if i < 5:
-                        print("Could not retrieve shortlist %s because of exception %s, sleeping..." % (self.params.shortlist_key, e))
+                        print(
+                            f"Could not retrieve shortlist {self.params.shortlist_key} because of exception {e}, sleeping..."
+                        )
                         time.sleep(60)
                         i += 1
                     else:
-                        print("Could not retrieve shortlist %s because of exception %s, exiting" % (self.params.shortlist_key, e))
+                        print(
+                            f"Could not retrieve shortlist {self.params.shortlist_key} because of exception {e}, exiting"
+                        )
                         sys.exit(1)
-        else:
-            if not os.path.exists(self.params.shortlist_key):
-                return None
+        elif os.path.exists(self.params.shortlist_key):
             df = pd.read_csv(self.params.shortlist_key, index_col=False)
+        else:
+            return None
         if df is None:
             sys.exit(1)
         if len(df.columns) == 1:
             assays = df[df.columns[0]].values.tolist()
         else:
-            if 'task_name' in df.columns:
-                col_name = 'task_name'
-            else:
-                col_name = 'dataset_key'
+            col_name = 'task_name' if 'task_name' in df.columns else 'dataset_key'
             assays = df[col_name].values.tolist()
         if 'bucket' in df.columns:
             datasets = list(zip(assays, df.bucket.values.tolist()))
@@ -714,8 +725,10 @@ class HyperparameterSearch(object):
         for splitter in splitters:
             split_name = '%s_%d_%d' % (splitter, self.params.split_valid_frac*100, self.params.split_test_frac*100)
             if split_name in df.columns:
-                for i, row in df.iterrows():
-                    assays.append((datasets[i][0], datasets[i][1], splitter, row[split_name]))
+                assays.extend(
+                    (datasets[i][0], datasets[i][1], splitter, row[split_name])
+                    for i, row in df.iterrows()
+                )
             else:
                 for assay, bucket in datasets:
                     try:
@@ -723,7 +736,7 @@ class HyperparameterSearch(object):
                         split_uuid = self.return_split_uuid(assay, bucket)
                         assays.append((assay, bucket, splitter, split_uuid))
                     except Exception as e:
-                        print("Splitting failed for dataset %s, skipping..." % assay)
+                        print(f"Splitting failed for dataset {assay}, skipping...")
                         print(e)
                         print(traceback.print_exc())
                         continue
@@ -815,7 +828,9 @@ class HyperparameterSearch(object):
                     time.sleep(60)
                     i += 1
                 else:
-                    print("Could not check Model Tracker for existing model at this time because of exception %s" % e)
+                    print(
+                        f"Could not check Model Tracker for existing model at this time because of exception {e}"
+                    )
                     return False
         if models:
             print("Already created model for this param combo")
@@ -877,16 +892,14 @@ class GridSearch(HyperparameterSearch):
         new_dict = {}
         for key, value in params_dict.items():
             assert isinstance(value, collections.Iterable)
-            if key == 'layers':
+            if key == 'layers' or type(value[0]) == str:
                 new_dict[key] = value
-            elif type(value[0]) != str:
+            else:
                 tmp_list = list(np.linspace(value[0], value[1], value[2]))
                 if key in self.convert_to_int:
                     new_dict[key] = [int(x) for x in tmp_list]
                 else:
                     new_dict[key] = tmp_list
-            else:
-                new_dict[key] = value
         return new_dict
 
 
@@ -926,16 +939,14 @@ class RandomSearch(HyperparameterSearch):
         new_dict = {}
         for key, value in params_dict.items():
             assert isinstance(value, collections.Iterable)
-            if key == 'layers':
+            if key == 'layers' or type(value[0]) == str:
                 new_dict[key] = value
-            elif type(value[0]) != str:
+            else:
                 tmp_list = list(np.random.uniform(value[0], value[1], value[2]))
                 if key in self.convert_to_int:
                     new_dict[key] = [int(x) for x in tmp_list]
                 else:
                     new_dict[key] = tmp_list
-            else:
-                new_dict[key] = value
         return new_dict
 
 
@@ -976,16 +987,14 @@ class GeometricSearch(HyperparameterSearch):
         new_dict = {}
         for key, value in params_dict.items():
             assert isinstance(value, collections.Iterable)
-            if key == 'layers':
+            if key == 'layers' or type(value[0]) == str:
                 new_dict[key] = value
-            elif type(value[0]) != str:
+            else:
                 tmp_list = list(np.geomspace(value[0], value[1], value[2]))
                 if key in self.convert_to_int:
                     new_dict[key] = [int(x) for x in tmp_list]
                 else:
                     new_dict[key] = tmp_list
-            else:
-                new_dict[key] = value
         return new_dict
 
 class UserSpecifiedSearch(HyperparameterSearch):
@@ -1025,14 +1034,16 @@ class UserSpecifiedSearch(HyperparameterSearch):
         new_dict = {}
         for key, value in params_dict.items():
             assert isinstance(value, collections.Iterable)
-            if key == 'layers':
+            if (
+                key == 'layers'
+                or key not in self.convert_to_int
+                and key not in self.convert_to_float
+            ):
                 new_dict[key] = value
             elif key in self.convert_to_int:
                 new_dict[key] = [int(x) for x in value]
-            elif key in self.convert_to_float:
-                new_dict[key] = [float(x) for x in value]
             else:
-                new_dict[key] = value
+                new_dict[key] = [float(x) for x in value]
         return new_dict
 
 

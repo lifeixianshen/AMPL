@@ -45,7 +45,7 @@ def create_splitting(params):
     elif params.split_strategy == 'k_fold_cv':
         return KFoldSplitting(params)
     else:
-        raise Exception("Unknown split strategy %s" % params.split_strategy)
+        raise Exception(f"Unknown split strategy {params.split_strategy}")
 
 # ****************************************************************************************
 def select_dset_by_attr_ids(dataset, attr_df):
@@ -63,8 +63,7 @@ def select_dset_by_attr_ids(dataset, attr_df):
     """
     id_df = pd.DataFrame({'indices' : np.arange(len(dataset.ids), dtype=np.int32)}, index=dataset.ids)
     match_df = id_df.join(attr_df, how='inner')
-    subset = dataset.select(match_df.indices.values)
-    return subset
+    return dataset.select(match_df.indices.values)
 
 # ****************************************************************************************
 def select_dset_by_id_list(dataset, id_list):
@@ -84,8 +83,7 @@ def select_dset_by_id_list(dataset, id_list):
     id_df = pd.DataFrame({'indices' : np.arange(len(dataset.ids), dtype=np.int32)}, index=dataset.ids)
     sel_df = pd.DataFrame(index=id_list)
     match_df = id_df.join(sel_df, how='inner')
-    subset = dataset.select(match_df.indices.values)
-    return subset
+    return dataset.select(match_df.indices.values)
 
 # ****************************************************************************************
 def select_attrs_by_dset_ids(dataset, attr_df):
@@ -103,8 +101,7 @@ def select_attrs_by_dset_ids(dataset, attr_df):
     """
     #TODO: Need to test
     id_df = pd.DataFrame(index=dataset.ids)
-    subattr_df = id_df.join(attr_df, how='inner')
-    return subattr_df
+    return id_df.join(attr_df, how='inner')
 
 # ****************************************************************************************
 def select_attrs_by_dset_smiles(dataset, attr_df, smiles_col):
@@ -125,8 +122,7 @@ def select_attrs_by_dset_smiles(dataset, attr_df, smiles_col):
     
     """
     id_df = pd.DataFrame(index=dataset.ids)
-    subattr_df = id_df.merge(attr_df, how='inner', left_index=True, right_on=smiles_col)
-    return subattr_df
+    return id_df.merge(attr_df, how='inner', left_index=True, right_on=smiles_col)
 
 # ****************************************************************************************
 def check_if_dupe_smiles_dataset(dataset,attr_df, smiles_col):
@@ -148,10 +144,7 @@ def check_if_dupe_smiles_dataset(dataset,attr_df, smiles_col):
     dupes = [(item, count) for item, count in collections.Counter(dataset.ids.tolist()).items() if count > 1]
     dupe_attr = [(item, count) for item, count in collections.Counter(attr_df[smiles_col].values.tolist()).items() if count > 1]
 
-    if not len(dupes)==0 or not len(dupe_attr)==0:
-        return True
-    else:
-        return False
+    return not not dupes or not not dupe_attr
 # ****************************************************************************************
 
 class Splitting(object):
@@ -210,10 +203,7 @@ class Splitting(object):
                 self.splitter = AVEMinSplitter(metric='euclidean')
         elif params.splitter == 'temporal':
             if params.base_splitter == 'ave_min':
-                if params.featurizer == 'ecfp':
-                    metric = 'jaccard'
-                else:
-                    metric = 'euclidean'
+                metric = 'jaccard' if params.featurizer == 'ecfp' else 'euclidean'
             else:
                 metric = None
             if params.base_splitter in smiles_splits:
@@ -224,7 +214,7 @@ class Splitting(object):
                     date_col=params.date_col,
                     base_splitter=params.base_splitter, metric=metric)
         else:
-            raise Exception("Unknown splitting method %s" % params.splitter)
+            raise Exception(f"Unknown splitting method {params.splitter}")
 
     # ****************************************************************************************
     def get_split_prefix(self, parent=''):
@@ -305,7 +295,7 @@ class KFoldSplitting(Splitting):
 
         """
         if parent != '':
-            parent = "%s/" % parent
+            parent = f"{parent}/"
         return "%s%d_fold_cv_%s" % (parent, self.num_folds, self.split)
 
     # ****************************************************************************************
@@ -360,12 +350,10 @@ class KFoldSplitting(Splitting):
             #train_cv, test = self.splitter.train_test_split(dataset, cutoff=self.params.butina_cutoff)
             train_cv, test, _ = self.splitter.train_valid_test_split(dataset)
             self.splitter = dc.splits.ScaffoldSplitter()
-            train_cv_pairs = self.splitter.k_fold_split(train_cv, self.num_folds)
         else:
             # TODO: Add special handling for AVE splitter
             train_cv, test = self.splitter.train_test_split(dataset, seed=np.random.seed(123), frac_train=train_frac)
-            train_cv_pairs = self.splitter.k_fold_split(train_cv, self.num_folds)
-    
+        train_cv_pairs = self.splitter.k_fold_split(train_cv, self.num_folds)
         train_valid_dsets = []
         train_valid_attr = []
 
@@ -442,8 +430,8 @@ class TrainValidTestSplitting(Splitting):
 
         """
         if parent != '':
-            parent = "%s/" % parent
-        return "%strain_valid_test_%s" % (parent, self.split)
+            parent = f"{parent}/"
+        return f"{parent}train_valid_test_{self.split}"
 
     # ****************************************************************************************
 
@@ -487,8 +475,8 @@ class TrainValidTestSplitting(Splitting):
         """
         if check_if_dupe_smiles_dataset(dataset, attr_df, smiles_col):
             raise Exception("Duplicate ids or smiles in the dataset")
-            
-        log.warning("Splitting data by %s" % self.params.splitter)
+
+        log.warning(f"Splitting data by {self.params.splitter}")
 
 
 

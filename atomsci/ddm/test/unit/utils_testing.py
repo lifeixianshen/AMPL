@@ -35,7 +35,7 @@ def datastore_status():
     try:
         a = datastore_objects()
     except Exception as e:
-        log.warning("datastore connection failed: " + str(e))
+        log.warning(f"datastore connection failed: {str(e)}")
         return True
     else:
         return False
@@ -64,8 +64,7 @@ def delaney_pipeline(y=["measured log solubility in mols per litre"], featurizer
     inp_params.featurizer = featurizer
     inp_params.split_strategy = split_strategy
     inp_params.splitter = splitter
-    mp = MP.ModelPipeline(inp_params)
-    return mp
+    return MP.ModelPipeline(inp_params)
 
 def datastore_objects(y = ["PIC50"]):
     params_from_ds = parse.wrapper(currentdir + '/config_datastore_dset_cav12.json')
@@ -95,10 +94,7 @@ def moe_descriptors(datastore = False):
 #         if not os.path.isfile(params_file.dataset_key):
 #             os.makedirs('pytest/config_MAOA_moe_descriptors/moe_descriptors', exist_ok=True)
 #             copyfile(params_ds.dataset_key, params_file.dataset_key)
-    if datastore == True:
-        params_desc = params_ds
-    else: 
-        params_desc = params_file
+    params_desc = params_ds if datastore == True else params_file
     featurization = feat.create_featurization(params_desc)
     dataset_obj_for_desc = model_dataset.create_model_dataset(params_desc, featurization, ds_client = None)
     df = dataset_obj_for_desc.load_full_dataset()

@@ -46,10 +46,7 @@ def negative_predictive_value(y_real, y_pred):
     """
     TN = sum((y_pred == 0) & (y_real == 0))
     FN = sum((y_pred == 0) & (y_real == 1))
-    if TN + FN == 0:
-        return 0.0
-    else:
-        return float(TN)/float(TN+FN)
+    return 0.0 if TN + FN == 0 else float(TN)/float(TN+FN)
 
 # ******************************************************************************************************************************
 
@@ -110,7 +107,7 @@ def create_perf_data(prediction_type, model_dataset, transformers, subset, **kwa
         elif split_strategy == 'k_fold_cv':
             return KFoldRegressionPerfData(model_dataset, transformers, subset, **kwargs)
         else:
-            raise ValueError('Unknown split_strategy %s' % split_strategy)
+            raise ValueError(f'Unknown split_strategy {split_strategy}')
     elif prediction_type == 'classification':
         #if subset in ['test', 'full'] or split_strategy == 'train_valid_test':
         if subset == 'full' or split_strategy == 'train_valid_test':
@@ -118,9 +115,9 @@ def create_perf_data(prediction_type, model_dataset, transformers, subset, **kwa
         elif split_strategy == 'k_fold_cv':
             return KFoldClassificationPerfData(model_dataset, transformers, subset, **kwargs)
         else:
-            raise ValueError('Unknown split_strategy %s' % split_strategy)
+            raise ValueError(f'Unknown split_strategy {split_strategy}')
     else:
-        raise ValueError('Unknown prediction type %s' % prediction_type)
+        raise ValueError(f'Unknown prediction type {prediction_type}')
 
 # ****************************************************************************************
 class PerfData(object):
@@ -297,11 +294,9 @@ class RegressionPerfData(PerfData):
             pred_results (dict): dictionary of performance metrics for a regression model.
 
         """
-        pred_results = {}
-
         # Get the mean and SD of R^2 scores over folds. If only single fold training was done, the SD will be None.
         r2_means, r2_stds = self.compute_perf_metrics(per_task=True)
-        pred_results['r2_score'] = float(np.mean(r2_means))
+        pred_results = {'r2_score': float(np.mean(r2_means))}
         if r2_stds is not None:
             pred_results['r2_std'] = float(np.sqrt(np.mean(r2_stds ** 2)))
         if self.num_tasks > 1:
@@ -467,13 +462,15 @@ class ClassificationPerfData(PerfData):
         real_vals = self.get_real_values()
         weights = self.get_weights()
         scores = []
-            
+
         for i in range(self.num_tasks):
             nzrows = np.where(weights[:,i] != 0)[0]
             average_param = None
             if self.num_classes > 2:
                 if score_type in binary_class_only:
-                    raise ValueError("Model selection by %s score not allowed for multi-label classifiers." % score_type)
+                    raise ValueError(
+                        f"Model selection by {score_type} score not allowed for multi-label classifiers."
+                    )
                 if score_type in has_average_param:
                     average_param = 'macro'
                 # If more than 2 classes, task_real_vals is indicator matrix (one-hot encoded). 
@@ -520,7 +517,6 @@ class ClassificationPerfData(PerfData):
             pred_results (dict): dictionary of performance metrics for a classification model.
             
         """
-        pred_results = {}
         (ids, pred_classes, class_probs, prob_stds) = self.get_pred_values()
 
         real_vals = self.get_real_values(ids)
@@ -536,7 +532,7 @@ class ClassificationPerfData(PerfData):
 
         # Get the mean and SD of ROC AUC scores over folds. If only single fold training was done, the SD will be None.
         roc_auc_means, roc_auc_stds = self.compute_perf_metrics(per_task=True)
-        pred_results['roc_auc_score'] = float(np.mean(roc_auc_means))
+        pred_results = {'roc_auc_score': float(np.mean(roc_auc_means))}
         if roc_auc_stds is not None:
             pred_results['roc_auc_std'] = float(np.sqrt(np.mean(roc_auc_stds ** 2)))
         if self.num_tasks > 1:
@@ -725,7 +721,7 @@ class KFoldRegressionPerfData(RegressionPerfData):
         elif self.subset == 'test':
             dataset = model_dataset.test_dset
         else:
-            raise ValueError('Unknown dataset subset type "%s"' % self.subset)
+            raise ValueError(f'Unknown dataset subset type "{self.subset}"')
         self.num_cmpds = dataset.y.shape[0]
         self.num_tasks = dataset.y.shape[1]
         self.pred_vals = dict([(id, np.empty((0, self.num_tasks), dtype=np.float32)) for id in dataset.ids])
@@ -972,7 +968,7 @@ class KFoldClassificationPerfData(ClassificationPerfData):
         elif self.subset == 'test':
             dataset = model_dataset.test_dset
         else:
-            raise ValueError('Unknown dataset subset type "%s"' % self.subset)
+            raise ValueError(f'Unknown dataset subset type "{self.subset}"')
 
         # All currently used classifiers generate class probabilities in their predict methods;
         # if in the future we implement a classification algorithm such as kNN that doesn't support
@@ -1001,11 +997,7 @@ class KFoldClassificationPerfData(ClassificationPerfData):
         self.folds = 0
         self.perf_metrics = []
         self.model_score = None
-        if transformed:
-            # Predictions passed to accumulate_preds() will be transformed
-            self.transformers = transformers
-        else:
-            self.transformers = []
+        self.transformers = transformers if transformed else []
 
 
     # ****************************************************************************************
@@ -1231,7 +1223,7 @@ class SimpleRegressionPerfData(RegressionPerfData):
         elif subset == 'full':
             dataset = model_dataset.dataset
         else:
-            raise ValueError('Unknown dataset subset type "%s"' % subset)
+            raise ValueError(f'Unknown dataset subset type "{subset}"')
         self.num_cmpds = dataset.y.shape[0]
         self.num_tasks = dataset.y.shape[1]
         self.weights = dataset.w
@@ -1302,12 +1294,20 @@ class SimpleRegressionPerfData(RegressionPerfData):
         stds = None
         if self.pred_stds is not None:
             stds = self.pred_stds
-            if len(self.transformers) == 1 and (isinstance(self.transformers[0], dc.trans.NormalizationTransformer) or isinstance(self.transformers[0],trans.NormalizationTransformerMissingData)):
+            if len(self.transformers) == 1 and (
+                isinstance(
+                    self.transformers[0],
+                    (
+                        dc.trans.NormalizationTransformer,
+                        trans.NormalizationTransformerMissingData,
+                    ),
+                )
+            ):
                 # Untransform the standard deviations, if we can. This is a bit of a hack, but it works for
                 # NormalizationTransformer, since the standard deviations used to scale the data are
                 # stored in the transformer object.
-                    y_stds = self.transformers[0].y_stds.reshape((1,-1,1))
-                    stds = stds / y_stds
+                y_stds = self.transformers[0].y_stds.reshape((1,-1,1))
+                stds = stds / y_stds
         return (self.ids, vals, stds)
 
 

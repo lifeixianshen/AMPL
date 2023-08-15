@@ -42,14 +42,13 @@ def plot_pred_vs_actual(MP, epoch_label='best', threshold=None, error_bars=False
         return
     wrapper = MP.model_wrapper
     if pdf_dir is not None:
-        pdf_path = os.path.join(pdf_dir, '%s_%s_%s_%s_pred_vs_actual.pdf' % (params.dataset_name, params.model_type,
-                                params.featurizer, params.splitter))
+        pdf_path = os.path.join(
+            pdf_dir,
+            f'{params.dataset_name}_{params.model_type}_{params.featurizer}_{params.splitter}_pred_vs_actual.pdf',
+        )
         pdf = PdfPages(pdf_path)
 
-    if MP.run_mode == 'training':
-        subsets = ['train', 'valid', 'test']
-    else:
-        subsets = ['full']
+    subsets = ['train', 'valid', 'test'] if MP.run_mode == 'training' else ['full']
     dataset_name = MP.data.dataset_name
     splitter = MP.params.splitter
     model_type = MP.params.model_type
@@ -61,10 +60,7 @@ def plot_pred_vs_actual(MP, epoch_label='best', threshold=None, error_bars=False
         y_actual = perf_data.get_real_values()
         ids, y_pred, y_std = perf_data.get_pred_values()
         r2 = pred_results['r2_score']
-        if perf_data.num_tasks > 1:
-            r2_scores = pred_results['task_r2_scores']
-        else:
-            r2_scores = [r2]
+        r2_scores = pred_results['task_r2_scores'] if perf_data.num_tasks > 1 else [r2]
         for t in range(MP.params.num_model_tasks):
             fig, ax = plt.subplots(figsize=(12.0,12.0))
             title = '%s\n%s split %s model on %s features\n%s subset predicted vs actual %s, R^2 = %.3f' % (
@@ -91,7 +87,7 @@ def plot_pred_vs_actual(MP, epoch_label='best', threshold=None, error_bars=False
                 pdf.savefig(fig)
     if pdf_dir is not None:
         pdf.close()
-        MP.log.info("Wrote plot to %s" % pdf_path)
+        MP.log.info(f"Wrote plot to {pdf_path}")
 
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -124,7 +120,10 @@ def plot_perf_vs_epoch(MP, pdf_dir=None):
         perf_label = 'ROC AUC'
 
     if pdf_dir is not None:
-        pdf_path = os.path.join(pdf_dir, '%s_perf_vs_epoch.pdf' % os.path.basename(MP.params.output_dir))
+        pdf_path = os.path.join(
+            pdf_dir,
+            f'{os.path.basename(MP.params.output_dir)}_perf_vs_epoch.pdf',
+        )
         pdf = PdfPages(pdf_path)
     subset_colors = dict(training='blue', validation='forestgreen', test='red')
     subset_shades = dict(training='deepskyblue', validation='lightgreen', test='hotpink')
@@ -155,7 +154,7 @@ def plot_perf_vs_epoch(MP, pdf_dir=None):
     plt.axvline(best_epoch, color='red', linestyle='--')
     ax.set_xlabel('Epoch')
     if model_score_type in perf.loss_funcs:
-        score_label = "negative %s" % model_score_type
+        score_label = f"negative {model_score_type}"
     else:
         score_label = model_score_type
     ax.set_ylabel(score_label)
@@ -163,7 +162,7 @@ def plot_perf_vs_epoch(MP, pdf_dir=None):
     if pdf_dir is not None:
         pdf.savefig(fig)
         pdf.close()
-        MP.log.info("Wrote plot to %s" % pdf_path)
+        MP.log.info(f"Wrote plot to {pdf_path}")
 
 
 
@@ -174,13 +173,10 @@ def get_perf_curve_data(MP, epoch_label, curve_type='ROC'):
     for each training/test data subset.
     """
     if MP.params.prediction_type != 'classification':
-        MP.log.error("Can only plot %s curve for classification models" % curve_type)
+        MP.log.error(f"Can only plot {curve_type} curve for classification models")
         return {}
 
-    if MP.run_mode == 'training':
-        subsets = ['train', 'valid', 'test']
-    else:
-        subsets = ['full']
+    subsets = ['train', 'valid', 'test'] if MP.run_mode == 'training' else ['full']
     wrapper = MP.model_wrapper
     curve_data = {}
     for subset in subsets:
@@ -190,7 +186,9 @@ def get_perf_curve_data(MP, epoch_label, curve_type='ROC'):
         ntasks = class_probs.shape[1]
         nclasses = class_probs.shape[-1]
         if nclasses != 2:
-            MP.log.error("%s curve plot is only supported for binary classifiers" % curve_type)
+            MP.log.error(
+                f"{curve_type} curve plot is only supported for binary classifiers"
+            )
             return {}
         prob_active = class_probs[:,:,1]
         roc_aucs = [metrics.roc_auc_score(true_classes[:,i], prob_active[:,i], average='macro') 
@@ -209,14 +207,12 @@ def plot_ROC_curve(MP, epoch_label='best', pdf_dir=None):
     curve_data = get_perf_curve_data(MP, epoch_label, 'ROC')
     if len(curve_data) == 0:
         return
-    if MP.run_mode == 'training':
-        # Draw overlapping ROC curves for train, valid and test sets
-        subsets = ['train', 'valid', 'test']
-    else:
-        subsets = ['full']
+    subsets = ['train', 'valid', 'test'] if MP.run_mode == 'training' else ['full']
     if pdf_dir is not None:
-        pdf_path = os.path.join(pdf_dir, '%s_%s_model_%s_features_%s_split_ROC_curves.pdf' % (
-                                params.dataset_name, params.model_type, params.featurizer, params.splitter))
+        pdf_path = os.path.join(
+            pdf_dir,
+            f'{params.dataset_name}_{params.model_type}_model_{params.featurizer}_features_{params.splitter}_split_ROC_curves.pdf',
+        )
         pdf = PdfPages(pdf_path)
     subset_colors = dict(train='blue', valid='forestgreen', test='red', full='purple')
     # For multitask, do a separate figure for each task
@@ -229,19 +225,19 @@ def plot_ROC_curve(MP, epoch_label='best', pdf_dir=None):
         for subset in subsets:
             fpr, tpr, thresholds = metrics.roc_curve(curve_data[subset]['true_classes'][:,i],
                                                      curve_data[subset]['prob_active'][:,i])
-      
+
             roc_auc = curve_data[subset]['roc_aucs'][i]
             ax.step(fpr, tpr, color=subset_colors[subset], label="%s: AUC = %.3f" % (subset, roc_auc))
         ax.set_xlabel('False positive rate')
         ax.set_ylabel('True positive rate')
         ax.set_title(title, fontdict={'fontsize' : 12})
         legend = ax.legend(loc='lower right')
-    
+
         if pdf_dir is not None:
             pdf.savefig(fig)
     if pdf_dir is not None:
         pdf.close()
-        MP.log.info("Wrote plot to %s" % pdf_path)
+        MP.log.info(f"Wrote plot to {pdf_path}")
 
 
 #------------------------------------------------------------------------------------------------------------------------
@@ -253,14 +249,12 @@ def plot_prec_recall_curve(MP, epoch_label='best', pdf_dir=None):
     curve_data = get_perf_curve_data(MP, epoch_label, 'precision-recall')
     if len(curve_data) == 0:
         return
-    if MP.run_mode == 'training':
-        # Draw overlapping PR curves for train, valid and test sets
-        subsets = ['train', 'valid', 'test']
-    else:
-        subsets = ['full']
+    subsets = ['train', 'valid', 'test'] if MP.run_mode == 'training' else ['full']
     if pdf_dir is not None:
-        pdf_path = os.path.join(pdf_dir, '%s_%s_model_%s_features_%s_split_PRC_curves.pdf' % (
-                                params.dataset_name, params.model_type, params.featurizer, params.splitter))
+        pdf_path = os.path.join(
+            pdf_dir,
+            f'{params.dataset_name}_{params.model_type}_model_{params.featurizer}_features_{params.splitter}_split_PRC_curves.pdf',
+        )
         pdf = PdfPages(pdf_path)
     subset_colors = dict(train='blue', valid='forestgreen', test='red', full='purple')
     # For multitask, do a separate figure for each task
@@ -273,19 +267,19 @@ def plot_prec_recall_curve(MP, epoch_label='best', pdf_dir=None):
         for subset in subsets:
             precision, recall, thresholds = metrics.precision_recall_curve(curve_data[subset]['true_classes'][:,i],
                                                      curve_data[subset]['prob_active'][:,i])
-      
+
             prc_auc = curve_data[subset]['prc_aucs'][i]
             ax.step(recall, precision, color=subset_colors[subset], label="%s: AUC = %.3f" % (subset, prc_auc))
         ax.set_xlabel('Recall')
         ax.set_ylabel('Precision')
         ax.set_title(title, fontdict={'fontsize' : 12})
         legend = ax.legend(loc='lower right')
-    
+
         if pdf_dir is not None:
             pdf.savefig(fig)
     if pdf_dir is not None:
         pdf.close()
-        MP.log.info("Wrote plot to %s" % pdf_path)
+        MP.log.info(f"Wrote plot to {pdf_path}")
 
 #------------------------------------------------------------------------------------------------------------------------
 def plot_umap_feature_projections(MP, ndim=2, num_neighbors=20, min_dist=0.1, 
