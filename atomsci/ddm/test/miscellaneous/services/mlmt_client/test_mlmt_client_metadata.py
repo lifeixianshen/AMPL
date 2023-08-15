@@ -605,7 +605,7 @@ class TestMetadataFailure(object):
             'model_uuid': 'uuid_1',
             'ModelMetadata': {}
         }
-        collection_name = COLLECTION_NAME + '_metrics'
+        collection_name = f'{COLLECTION_NAME}_metrics'
         errors = ('Status400Exception: collection_name={collection_name}'
                   ' contains the word "metrics".').format(
             collection_name=collection_name)

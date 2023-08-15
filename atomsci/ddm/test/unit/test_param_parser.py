@@ -137,9 +137,7 @@ def test_default_params_json():
     params = parse.wrapper(currentdir + '/config_required_inputs.json')
     defaults = default_parameters()
     defaults.config_file = currentdir + '/config_required_inputs.json'
-    test = []
-    test.append(params == defaults)
-    test.append(params.transformers)
+    test = [params == defaults, params.transformers]
     assert all(test)
     
 def test_dupe_params_json(caplog):
@@ -156,33 +154,35 @@ def test_incorrect_params_json(caplog):
 
 def test_correct_input_mixed_command_line_types():
     params = parse.wrapper(config_inputs)
-    test = []
-    test.append(params.system == 'twintron-blue')
-    test.append(params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv')
-    test.append(params.layer_sizes == [42,42])
-    test.append(params.batch_size == 63)
-    test.append(params.previously_split)
-    test.append(params.descriptor_type == 'moe') 
-    test.append(not params.datastore)
-    test.append(params.response_cols == ['one1','two2','three3'])
-    test.append(params.baseline_epoch == 78)
-    test.append(params.splitter == 'random')
-    test.append(not params.transformers)
+    test = [
+        params.system == 'twintron-blue',
+        params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv',
+        params.layer_sizes == [42, 42],
+        params.batch_size == 63,
+        params.previously_split,
+        params.descriptor_type == 'moe',
+        not params.datastore,
+        params.response_cols == ['one1', 'two2', 'three3'],
+        params.baseline_epoch == 78,
+        params.splitter == 'random',
+        not params.transformers,
+    ]
     assert all(test)
     
 def test_correct_input_type_json():
     params = parse.wrapper(currentdir + '/config_list_inputs.json')
-    test = []
-    test.append(params.system == 'twintron-blue')
-    test.append(params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv')
-    test.append(params.layer_sizes == [42,42])
-    test.append(params.batch_size == 63)
-    test.append(params.previously_split)
-    test.append(params.descriptor_type == 'moe')
-    test.append(not params.datastore)
-    test.append(params.model_type == ['NN','RF'])
-    test.append(params.response_cols == ['task1','task2','task3'])
-    test.append(not params.transformers)
+    test = [
+        params.system == 'twintron-blue',
+        params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv',
+        params.layer_sizes == [42, 42],
+        params.batch_size == 63,
+        params.previously_split,
+        params.descriptor_type == 'moe',
+        not params.datastore,
+        params.model_type == ['NN', 'RF'],
+        params.response_cols == ['task1', 'task2', 'task3'],
+        not params.transformers,
+    ]
     assert all(test)
 
 """
@@ -220,28 +220,35 @@ def test_dupe_param_command():
 def test_correct_input_type_command():
 
     params = parse.wrapper(list_inputs)
-    test = []
-    test.append(params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv')
-    test.append(params.batch_size == 63)
-    test.append(params.previously_split)
-    test.append(params.descriptor_type == 'moe' )
-    test.append(params.response_cols == ['task1','task2','task3'])
-    test.append(not params.datastore)
-    test.append(params.model_type == ['NN','RF'])
-    test.append(params.model_filter == {'model_uuid': 'uuid_1',
- 'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
- 'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
- 'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
- 'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
- 'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
- 'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
- 'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
- 'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]"})
-    test.append(params.dropouts == [[0.001,0.001], [0.02,0.02,0.5], [0.3,0.3,0.3]])
-    test.append(params.layer_sizes == [[1000,500], [300,300,300], [20000,50,50]])
-    test.append(params.weight_init_stddevs == [[0.001,0.001], [0.02,0.02,0.5], [0.3,0.3,0.3]])
-    test.append(params.bias_init_consts == [[1.0,1.0], [2.0,2.0,2.0], [0.3,0.3,0.3]])
-    test.append(params.learning_rate == 1)
+    test = [
+        params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv',
+        params.batch_size == 63,
+        params.previously_split,
+        params.descriptor_type == 'moe',
+        params.response_cols == ['task1', 'task2', 'task3'],
+        not params.datastore,
+        params.model_type == ['NN', 'RF'],
+        params.model_filter
+        == {
+            'model_uuid': 'uuid_1',
+            'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
+            'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
+            'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
+            'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
+            'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
+            'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
+            'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
+            'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]",
+        },
+        params.dropouts
+        == [[0.001, 0.001], [0.02, 0.02, 0.5], [0.3, 0.3, 0.3]],
+        params.layer_sizes == [[1000, 500], [300, 300, 300], [20000, 50, 50]],
+        params.weight_init_stddevs
+        == [[0.001, 0.001], [0.02, 0.02, 0.5], [0.3, 0.3, 0.3]],
+        params.bias_init_consts
+        == [[1.0, 1.0], [2.0, 2.0, 2.0], [0.3, 0.3, 0.3]],
+        params.learning_rate == 1,
+    ]
     assert all(test)
 
 def test_default_params_namespace():
@@ -268,29 +275,31 @@ def test_undefined_param_namespace(caplog):
 def test_correct_input_type_namespace():
 
     params = parse.wrapper(list_inputs_namespace)
-    test = []
-    test.append(params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv')
-    test.append(params.layer_sizes == [42,42])
-    test.append(params.batch_size == 63)
-    test.append(params.previously_split)
-    test.append(params.descriptor_type == 'moe')
-    test.append(params.descriptor_key == '/ds/projdata/gsk_data/GSK_Descriptors/all_GSK_Compound_2D_3D_MOE_Descriptors_Scaled_With_Smiles_And_Inchi.csv')
-    test.append(not params.datastore)
-    test.append(params.response_cols == ['task1','task2','task3'])
-    test.append(not params.transformers)
-    test.append(params.model_type == ['NN','RF'])
-
-    test.append(params.model_filter == {'model_uuid': 'uuid_1',
- 'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
- 'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
- 'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
- 'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
- 'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
- 'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
- 'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
- 'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]"})
-    
-    
+    test = [
+        params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv',
+        params.layer_sizes == [42, 42],
+        params.batch_size == 63,
+        params.previously_split,
+        params.descriptor_type == 'moe',
+        params.descriptor_key
+        == '/ds/projdata/gsk_data/GSK_Descriptors/all_GSK_Compound_2D_3D_MOE_Descriptors_Scaled_With_Smiles_And_Inchi.csv',
+        not params.datastore,
+        params.response_cols == ['task1', 'task2', 'task3'],
+        not params.transformers,
+        params.model_type == ['NN', 'RF'],
+        params.model_filter
+        == {
+            'model_uuid': 'uuid_1',
+            'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
+            'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
+            'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
+            'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
+            'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
+            'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
+            'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
+            'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]",
+        },
+    ]
     params = parse.wrapper(list_inputs_dict)
     test.append(params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv')
     test.append(params.layer_sizes == [42,42])
@@ -303,39 +312,44 @@ def test_correct_input_type_namespace():
 
     test.append(params.response_cols == ['task1','task2','task3'])
     test.append(not params.transformers)
-    test.append(params.model_filter == {'model_uuid': 'uuid_1',
- 'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
- 'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
- 'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
- 'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
- 'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
- 'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
- 'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
- 'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]"})
+       test.append(params.model_filter == {'model_uuid': 'uuid_1',
+    'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
+    'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
+    'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
+    'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
+    'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
+    'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
+    'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
+    'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]"})
     assert all(test)
     
 def test_command_line_namespace_and_dict_input():
 
     params = parse.wrapper(command_line_namespace_inputs)
-    test = []
-    test.append(params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv')
-    test.append(params.layer_sizes == [42,42])
-    test.append(params.batch_size == 63)
-    test.append(params.previously_split)
-    test.append(params.descriptor_type == 'moe')
-    test.append(params.descriptor_key == '/ds/projdata/gsk_data/GSK_Descriptors/all_GSK_Compound_2D_3D_MOE_Descriptors_Scaled_With_Smiles_And_Inchi.csv')
-    test.append(not params.datastore)
-    test.append(params.response_cols == ['task1','task2','task3'])
-    test.append(not params.transformers)
-    test.append(params.model_filter == {'model_uuid': 'uuid_1',
- 'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
- 'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
- 'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
- 'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
- 'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
- 'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
- 'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
- 'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]"})
+    test = [
+        params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv',
+        params.layer_sizes == [42, 42],
+        params.batch_size == 63,
+        params.previously_split,
+        params.descriptor_type == 'moe',
+        params.descriptor_key
+        == '/ds/projdata/gsk_data/GSK_Descriptors/all_GSK_Compound_2D_3D_MOE_Descriptors_Scaled_With_Smiles_And_Inchi.csv',
+        not params.datastore,
+        params.response_cols == ['task1', 'task2', 'task3'],
+        not params.transformers,
+        params.model_filter
+        == {
+            'model_uuid': 'uuid_1',
+            'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
+            'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
+            'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
+            'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
+            'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
+            'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
+            'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
+            'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]",
+        },
+    ]
     params = parse.wrapper(command_line_dict_inputs)
     test.append(params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv')
     test.append(params.layer_sizes == [42,42])
@@ -346,35 +360,35 @@ def test_command_line_namespace_and_dict_input():
     test.append(not params.datastore)
     test.append(params.response_cols == ['task1','task2','task3'])
     test.append(not params.transformers)
-    test.append(params.model_filter == {'model_uuid': 'uuid_1',
- 'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
- 'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
- 'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
- 'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
- 'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
- 'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
- 'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
- 'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]"})
+       test.append(params.model_filter == {'model_uuid': 'uuid_1',
+    'ModelMetadata.TrainingDataset.dataset_key': "['=', 2]",
+    'ModelMetadata.TrainingDataset.dataset_bucket': "['>', 2]",
+    'ModelMetadata.TrainingDataset.dataset_oid': "['>=', 2]",
+    'ModelMetadata.TrainingDataset.class_names': "['in', [1,2,3]]",
+    'ModelMetadata.TrainingDataset.num_classes': "['<', 2]",
+    'ModelMetadata.TrainingDataset.feature_transform_type': "['<=', 2]",
+    'ModelMetadata.TrainingDataset.response_transform_type': "['!=', 3]",
+    'ModelMetadata.TrainingDataset.id_col': "['nin', [0,1,3,4]]"})
     assert all(test)
     
 def test_hierarchical_dict():
     params = parse.wrapper(hierarchical_input_dict)
-    test = []
-    test.append(params.system == 'twintron-blue')
-    test.append(params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv')
-    test.append(params.layer_sizes == [42,42])
-    test.append(params.batch_size == 63)
-    test.append(params.previously_split)
-    test.append(params.descriptor_type == 'moe')
-    test.append(not params.datastore)
-    test.append(params.model_type == ['NN','RF'])
-    test.append(params.response_cols == ['task1','task2','task3'])
-    test.append(not params.transformers)
+    test = [
+        params.system == 'twintron-blue',
+        params.dataset_key == '/ds/data/public/delaney/delaney-processed.csv',
+        params.layer_sizes == [42, 42],
+        params.batch_size == 63,
+        params.previously_split,
+        params.descriptor_type == 'moe',
+        not params.datastore,
+        params.model_type == ['NN', 'RF'],
+        params.response_cols == ['task1', 'task2', 'task3'],
+        not params.transformers,
+    ]
     assert all(test)
 
 
 #test dictionary input
     
 def default_parameters():
-    default_params = parse.list_defaults()
-    return default_params
+    return parse.list_defaults()

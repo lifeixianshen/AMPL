@@ -45,10 +45,11 @@ def test_remove_duplicate_smiles(caplog):
     """checking for removal of duplicates and activity with dataframes with no dupes"""
     #checking for a file with no dupes
     no_dupe_df = feat.remove_duplicate_smiles(df_delaney,smiles_col=delaney_params_ecfp.smiles_col)
-    test = []
-    test.append((len(no_dupe_df) <= len(df_delaney)))
-    test.append(len(set(no_dupe_df[delaney_params_ecfp.smiles_col].values.tolist())) <= len(no_dupe_df))
-    
+    test = [
+        len(no_dupe_df) <= len(df_delaney),
+        len(set(no_dupe_df[delaney_params_ecfp.smiles_col].values.tolist()))
+        <= len(no_dupe_df),
+    ]
     #checking for a file with dupes
     # TODO (ksm): Replace the CaV1.2 dataset I plugged in for datastore testing with a non-ML-ready dataset with dupes.
     if not datastore_is_down:
@@ -60,19 +61,24 @@ def test_remove_duplicate_smiles(caplog):
 
 def test_create_featurization_dynamicfeaturization():
     """testing if classes are properly generated from the factory method. Asserting that the correct methods exist, and are callable. Asserting correct dc featurizer object is called"""
-    test = []
-    test.append(isinstance(featurizer_ecfp, feat.DynamicFeaturization))
+    test = [isinstance(featurizer_ecfp, feat.DynamicFeaturization)]
     methods = ["featurize_data","get_feature_columns","extract_prefeaturized_data","get_feature_count","get_feature_specific_metadata","get_featurized_dset_name","get_featurized_data_subdir"]
-    for method in methods:
-        test.append(callable(getattr(featurizer_ecfp,method)))
-        
-    test.append(isinstance(featurizer_ecfp.featurizer_obj, dc.feat.fingerprints.CircularFingerprint))
-    
-    test.append(isinstance(featurizer_graphconv.featurizer_obj, dc.feat.graph_features.ConvMolFeaturizer))    
-
+    test.extend(callable(getattr(featurizer_ecfp,method)) for method in methods)
+    test.extend(
+        (
+            isinstance(
+                featurizer_ecfp.featurizer_obj,
+                dc.feat.fingerprints.CircularFingerprint,
+            ),
+            isinstance(
+                featurizer_graphconv.featurizer_obj,
+                dc.feat.graph_features.ConvMolFeaturizer,
+            ),
+        )
+    )
     if mol_vae_supported:
         test.append(isinstance(featurizer_molvae.featurizer_obj, MoleculeVAEFeaturizer))
-    
+
     assert all(test)
         
 
@@ -80,14 +86,11 @@ def test_create_featurization_dynamicfeaturization():
 #***********************************************************************************    
 def test_get_feature_columns_dynamicfeaturization():
     """ Testing that dynamic featurization is pulling out the correct number of features and 'column names'. Also technically testing get_feature_count"""
-    test = []
     cols = featurizer_ecfp.get_feature_columns()
-    test.append(len(cols) == delaney_params_ecfp.ecfp_size)
-    test.append(cols[0] == 'c0')
-    
+    test = [len(cols) == delaney_params_ecfp.ecfp_size, cols[0] == 'c0']
     cols = featurizer_graphconv.get_feature_columns()
     test.append(len(cols) == 75)
-    
+
     if mol_vae_supported:
         cols = featurizer_molvae.get_feature_columns()
         test.append(len(cols) == 292)
@@ -202,7 +205,10 @@ def test_get_feature_specific_metadata_dynamicfeaturization():
 def get_featurized_dset_name_descriptorfeaturization():
     #sanity check that we are getting the correct featurized dset name. Also generating the featurized dset name for saving the featurized dataset. Used in model_datasets.save_featurized_data
     featurized_dset_name = featurizer_desc.get_featurized_dset_name(desc_data_obj.dataset_name)
-    assert featurized_dset_name == "subset_" + featurizer_desc.descriptor_key + "_" + featurizer_desc.dataset_name + ".csv"
+    assert (
+        featurized_dset_name
+        == f"subset_{featurizer_desc.descriptor_key}_{featurizer_desc.dataset_name}.csv"
+    )
     
 #***********************************************************************************
 def get_featurized_data_subdir_descriptorfeaturization():
@@ -210,15 +216,26 @@ def get_featurized_data_subdir_descriptorfeaturization():
     assert featurizer_desc.get_featurized_data_subdir() == "scaled_descriptors"
 #***********************************************************************************
 def get_get_feature_columns_and_count_descriptorfeaturization():
-    #sanity check for getting the feature columns. Also testing get_feature_count. Since dragon7 is not yet implemented, will not test for those columns.
-    test = []
-    moe_desc_cols = featurizer_desc.get_feature_columns() 
-    test.append(moe_desc_cols[0] == 'ASA+_per_atom')
-    test.append(len(moe_desc_cols) == 306 and featurizer_desc.get_feature_count() == 306)
-    moe_desc_cols_all = featurizer_desc.get_feature_columns(include_all=True) 
+    moe_desc_cols = featurizer_desc.get_feature_columns()
+    test = [
+        moe_desc_cols[0] == 'ASA+_per_atom',
+        (
+            len(moe_desc_cols) == 306
+            and featurizer_desc.get_feature_count() == 306
+        ),
+    ]
+    moe_desc_cols_all = featurizer_desc.get_feature_columns(include_all=True)
     excluded_moe_desc_cols = ['E', 'E_ang', 'E_ele', 'E_nb', 'E_oop', 'E_sol', 'E_stb', 'E_str', 'E_strain', 'E_tor', 'E_vdw']
-    test.append(set(excluded_moe_desc_cols).intersection(set(moe_desc_cols_all)) == set(excluded_moe_desc_cols))
-    test.append(len(excluded_moe_desc_cols) == 317 and featurizer_desc.get_feature_count(include_all=False) == 317)
+    test.extend(
+        (
+            set(excluded_moe_desc_cols).intersection(set(moe_desc_cols_all))
+            == set(excluded_moe_desc_cols),
+            (
+                len(excluded_moe_desc_cols) == 317
+                and featurizer_desc.get_feature_count(include_all=False) == 317
+            ),
+        )
+    )
     assert all(test)
     
 #***********************************************************************************

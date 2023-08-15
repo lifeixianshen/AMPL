@@ -60,8 +60,7 @@ def to_str(params_obj):
     else:
         strobj = dict_to_list(vars(params_obj),replace_spaces=True)
     separator = " "
-    str_params = separator.join(strobj)
-    return str_params
+    return separator.join(strobj)
 
 
 
@@ -79,48 +78,46 @@ def wrapper(*any_arg):
             TypeError: Input argument must be a configuration file (str), dict, argparse.Namespace, or list
 
     """
-    if len(any_arg) == 1:
-        inp_arg = any_arg[0]
-        if isinstance(inp_arg,str):
-            list_inp = parse_config_file(config_file_path = inp_arg)
-            return parse_command_line(list_inp)
-        elif isinstance(inp_arg, (dict,argparse.Namespace)):
-            list_inp = parse_namespace(inp_arg)
-            return parse_command_line(list_inp)
-        elif isinstance(inp_arg, list):
+    if len(any_arg) != 1:
+        raise TypeError("Input argument must be a configuration file (str), dict, argparse.Namespace, or list")
+    inp_arg = any_arg[0]
+    if isinstance(inp_arg,str):
+        list_inp = parse_config_file(config_file_path = inp_arg)
+        return parse_command_line(list_inp)
+    elif isinstance(inp_arg, (dict,argparse.Namespace)):
+        list_inp = parse_namespace(inp_arg)
+        return parse_command_line(list_inp)
+    elif isinstance(inp_arg, list):
             # This conditional statement checks for the positional argument '--config_file'
             # and parses the input .json configuration file into a list type input
-            if inp_arg[0] == '--config_file' or inp_arg[0] == '--config':
-                list_inp = parse_config_file(config_file_path = inp_arg[1])
-                # If there are additional arguments beyond the config_file input
-                # the following if statement properly appends the remaining arguments
-                #
-                if len(inp_arg) > 2:
-                    just_args = [x for x in inp_arg[2:] if "--" in x]
-                    for item in just_args:
-                        if item in list_inp:
-                            idx = list_inp.index(item)
-                            if "--" in list_inp[idx+1]:
-                                list_inp[idx:idx+1] = []
-                            else:
-                                list_inp[idx:idx+2] = []
-                    list_inp += inp_arg[2:]
-                return parse_command_line(list_inp)
-            elif len(inp_arg) == 1:
-                if inp_arg[0][0:9] == 'Namespace':
-                    eval_arg = eval('argparse.' + inp_arg[0])
-                    print(eval_arg)
-                else:
-                    eval_arg = eval(inp_arg[0])
-                if isinstance(eval_arg, (dict,argparse.Namespace)):
-                    list_inp = parse_namespace(eval_arg)
-                    return parse_command_line(list_inp)
-                else:
-                    return parse_command_line(eval_arg)
+        if inp_arg[0] in ['--config_file', '--config']:
+            list_inp = parse_config_file(config_file_path = inp_arg[1])
+            # If there are additional arguments beyond the config_file input
+            # the following if statement properly appends the remaining arguments
+            #
+            if len(inp_arg) > 2:
+                just_args = [x for x in inp_arg[2:] if "--" in x]
+                for item in just_args:
+                    if item in list_inp:
+                        idx = list_inp.index(item)
+                        if "--" in list_inp[idx+1]:
+                            list_inp[idx:idx+1] = []
+                        else:
+                            list_inp[idx:idx+2] = []
+                list_inp += inp_arg[2:]
+            return parse_command_line(list_inp)
+        elif len(inp_arg) == 1:
+            if inp_arg[0][:9] == 'Namespace':
+                eval_arg = eval(f'argparse.{inp_arg[0]}')
+                print(eval_arg)
             else:
-                return parse_command_line(inp_arg)
+                eval_arg = eval(inp_arg[0])
+            if not isinstance(eval_arg, (dict, argparse.Namespace)):
+                return parse_command_line(eval_arg)
+            list_inp = parse_namespace(eval_arg)
+            return parse_command_line(list_inp)
         else:
-            raise TypeError("Input argument must be a configuration file (str), dict, argparse.Namespace, or list")
+            return parse_command_line(inp_arg)
     else:
         raise TypeError("Input argument must be a configuration file (str), dict, argparse.Namespace, or list")
 
@@ -165,10 +162,12 @@ def parse_config_file(config_file_path):
     keep = list(vars(default).keys())
     newdict = {k: flat_dict[k] for k in keep if k in flat_dict}
 
-    # Writes a warning for any arguments that are not in the default list of parameters
-    extra_keys = [x for x in list(flat_dict.keys()) if x not in newdict.keys()]
-    if len(extra_keys)>0:
-        log.warning(str(extra_keys) + " are not part of the accepted list of parameters and will be ignored")
+    if extra_keys := [
+        x for x in list(flat_dict.keys()) if x not in newdict.keys()
+    ]:
+        log.warning(
+            f"{extra_keys} are not part of the accepted list of parameters and will be ignored"
+        )
     newdict['config_file'] = config_file_path
     return dict_to_list(newdict)
 
@@ -193,10 +192,10 @@ def flatten_dict(inp_dict,newdict = {}):
             flatten_dict(val,newdict)
         else:
             if key in newdict and newdict[key] != val:
-                log.warning(str(key) + " appears several times. Overwriting with value: " + str(val))
-                newdict[key] = val
-            else:
-                newdict[key] = val
+                log.warning(
+                    f"{str(key)} appears several times. Overwriting with value: {str(val)}"
+                )
+            newdict[key] = val
     return newdict
 
 #***********************************************************************************************************
@@ -235,10 +234,12 @@ def parse_namespace(namespace_params=None):
     keep = list(vars(default).keys())
     newdict = {k: flat_dict[k] for k in keep if k in flat_dict}
 
-    # Writes a warning for any arguments that are not in the default list of parameters
-    extra_keys = [x for x in list(flat_dict.keys()) if x not in newdict.keys()]
-    if len(extra_keys)>0:
-        log.warning(str(extra_keys) + " are not part of the accepted list of parameters and will be ignored")
+    if extra_keys := [
+        x for x in list(flat_dict.keys()) if x not in newdict.keys()
+    ]:
+        log.warning(
+            f"{extra_keys} are not part of the accepted list of parameters and will be ignored"
+        )
 
     return dict_to_list(newdict)
 
@@ -281,13 +282,13 @@ def dict_to_list(inp_dictionary,replace_spaces=False):
         if key in default_false:
             true_options = ['True','true','ture','TRUE','Ture']
             if str(value) in true_options:
-                temp_list_to_command_line.append('--' + str(key))
+                temp_list_to_command_line.append(f'--{str(key)}')
         elif key in default_true:
             false_options = ['False','false','flase','FALSE','Flase']
             if str(value) in false_options:
-                temp_list_to_command_line.append('--' + str(key))
+                temp_list_to_command_line.append(f'--{str(key)}')
         else:
-            temp_list_to_command_line.append('--' + str(key))
+            temp_list_to_command_line.append(f'--{str(key)}')
             # Special case handling for null values
             null_options = ['null','Null','none','None','N/A','n/a','NaN','nan','NAN','NONE','NULL']
             if str(value) in null_options:
@@ -344,14 +345,10 @@ def parse_command_line(args=None):
 
     # The following conditional checks for duplicates in the input list
     if args is not None:
-        if isinstance(args, str):
-            newlist = re.split(" ",args)
-        else:
-            newlist = args
+        newlist = re.split(" ",args) if isinstance(args, str) else args
         just_args = [x for x in newlist if "--" in x]
-        duplicates = set([x for x in just_args if just_args.count(x) > 1])
-        if len(duplicates) > 0:
-            raise ValueError(str(duplicates) + " appears several times. ")
+        if duplicates := {x for x in just_args if just_args.count(x) > 1}:
+            raise ValueError(f"{duplicates} appears several times. ")
 
     parser = get_parser()
     parsed_args = parser.parse_args(args)
@@ -538,7 +535,9 @@ def get_parser():
         '--batch_size', dest='batch_size', type=int, required=False, default=50,
         help='Sets the model batch size within model_wrapper')
 
-    temp_bias_init_consts_string = [key + ':' + value + ',' for key, value in bias_init_consts_options.items()]
+    temp_bias_init_consts_string = [
+        f'{key}:{value},' for key, value in bias_init_consts_options.items()
+    ]
     separator = " "
     bias_init_consts_help_string = \
         ('Comma-separated list of initial bias parameters per layer for dense NN models with conditional values. ' 
@@ -550,7 +549,9 @@ def get_parser():
         '--bias_init_consts', dest='bias_init_consts', required=False, default=None,
         help=bias_init_consts_help_string)
 
-    temp_dropout_string = [key + ':' + value + ',' for key, value in dropout_options.items()]
+    temp_dropout_string = [
+        f'{key}:{value},' for key, value in dropout_options.items()
+    ]
     separator = " "
     dropout_help_string = \
         ('Comma-separated list of dropout rates per layer for NN models with default values conditional on featurizer.' 
@@ -562,7 +563,9 @@ def get_parser():
         '--dropouts', dest='dropouts', required=False, default=None,
         help=dropout_help_string)
 
-    temp_layer_size_string = [key + ':' + value + ',' for key,value in layer_size_options.items()]
+    temp_layer_size_string = [
+        f'{key}:{value},' for key, value in layer_size_options.items()
+    ]
     separator = " "
     layer_size_help_string = \
         ('Comma-separated list of layer sizes for NN models with default values conditional on featurizer. Must be' 
@@ -591,7 +594,9 @@ def get_parser():
         help='weight_decay_penalty_type: str. The type of penalty to use for weight decay, either "l1" or "l2". ' 
              'Can be input as a comma separated list for hyperparameter search (e.g. \'l1,l2\')')
 
-    temp_weight_init_stddevs_string = [key + ':' + value + ',' for key, value in weight_init_stddevs_options.items()]
+    temp_weight_init_stddevs_string = [
+        f'{key}:{value},' for key, value in weight_init_stddevs_options.items()
+    ]
     separator = " "
     weight_init_stddevs_help_string = \
         ('Comma-separated list of standard deviations per layer for initializing weights in dense NN models with ' 

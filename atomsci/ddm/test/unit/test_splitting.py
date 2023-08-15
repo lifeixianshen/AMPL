@@ -78,58 +78,103 @@ def test_split_dataset_kfold_scaffold_from_pipeline(caplog):
     #assert no overlap of the k-fold validation sets between each other
     test_list = []
     for kfoldindex in range(0,nf):
-        test_list.append((data_obj_k_fold_scaffold.train_valid_dsets[kfoldindex][0].X == train_valid[kfoldindex][0].X).all())
-        test_list.append((data_obj_k_fold_scaffold.train_valid_dsets[kfoldindex][1].X == train_valid[kfoldindex][1].X).all())
-        test_list.append((data_obj_k_fold_scaffold.train_valid_dsets[kfoldindex][1].ids == train_valid[kfoldindex][1].ids).all())
-        test_list.append((data_obj_k_fold_scaffold.train_valid_dsets[kfoldindex][1].ids == train_valid[kfoldindex][1].ids).all())
-        test_list.append(train_valid_attr[kfoldindex][0].equals(data_obj_k_fold_scaffold.train_valid_attr[kfoldindex][0]))
-        test_list.append(train_valid_attr[kfoldindex][1].equals(data_obj_k_fold_scaffold.train_valid_attr[kfoldindex][1]))
+        test_list.extend(
+            (
+                (
+                    data_obj_k_fold_scaffold.train_valid_dsets[kfoldindex][0].X
+                    == train_valid[kfoldindex][0].X
+                ).all(),
+                (
+                    data_obj_k_fold_scaffold.train_valid_dsets[kfoldindex][1].X
+                    == train_valid[kfoldindex][1].X
+                ).all(),
+                (
+                    data_obj_k_fold_scaffold.train_valid_dsets[kfoldindex][
+                        1
+                    ].ids
+                    == train_valid[kfoldindex][1].ids
+                ).all(),
+                (
+                    data_obj_k_fold_scaffold.train_valid_dsets[kfoldindex][
+                        1
+                    ].ids
+                    == train_valid[kfoldindex][1].ids
+                ).all(),
+                train_valid_attr[kfoldindex][0].equals(
+                    data_obj_k_fold_scaffold.train_valid_attr[kfoldindex][0]
+                ),
+                train_valid_attr[kfoldindex][1].equals(
+                    data_obj_k_fold_scaffold.train_valid_attr[kfoldindex][1]
+                ),
+            )
+        )
     assert all(test_list)
-    test_list = []
     concat_valid = [x[1].ids.tolist() for x in train_valid]
     concat_valid = sum(concat_valid,[])
-    test_list.append(len(concat_valid) == len(set(concat_valid)))
-
+    test_list = [len(concat_valid) == len(set(concat_valid))]
     assert all(test_list)
     tv_split = []
     test_list = []
     #asserting that each k-fold split has no internal overlap.
     for kfoldindex in range(0,nf):
         current_tv_split = train_valid[kfoldindex][0].ids.tolist() + train_valid[kfoldindex][1].ids.tolist()
-        test_list.append(len(train_valid[kfoldindex][0].ids) == len(train_valid[kfoldindex][0].y))
-        test_list.append(len(train_valid[kfoldindex][1].ids) == len(train_valid[kfoldindex][1].y))
+        test_list.extend(
+            (
+                len(train_valid[kfoldindex][0].ids)
+                == len(train_valid[kfoldindex][0].y),
+                len(train_valid[kfoldindex][1].ids)
+                == len(train_valid[kfoldindex][1].y),
+            )
+        )
         current_full_dataset = sum([current_tv_split,test.ids.tolist()],[])
-        test_list.append(len(current_full_dataset) == len(set(current_full_dataset)))
-        test_list.append(set(train_valid[kfoldindex][0].ids.tolist()) == set(train_valid_attr[kfoldindex][0].index.tolist()))
-        test_list.append(set(train_valid[kfoldindex][1].ids.tolist()) == set(train_valid_attr[kfoldindex][1].index.tolist()))
+        test_list.extend(
+            (
+                len(current_full_dataset) == len(set(current_full_dataset)),
+                set(train_valid[kfoldindex][0].ids.tolist())
+                == set(train_valid_attr[kfoldindex][0].index.tolist()),
+                set(train_valid[kfoldindex][1].ids.tolist())
+                == set(train_valid_attr[kfoldindex][1].index.tolist()),
+            )
+        )
         #checking length of the validation set (should be length of the kv set/num_folds +/- 1)
         len_valid = round(len(current_tv_split)/nf)
         test_list.append(len_valid -1 <= len(train_valid[kfoldindex][1]) <= len_valid + 1)
         tv_split.append(current_tv_split)
-        
-    #asserting that all k-fold train valid sets are equivalent
-    test_list.append(set.intersection(*[set(l) for l in tv_split]) == set(tv_split[0]))
-    #aasserting that the test and test_attrs have the same index:
-    test_list.append(set(test.ids.tolist()) == set(test_attr.index.tolist()))
-    test_list.append(len(test.y) == len(test.ids))
+
+    test_list.extend(
+        (
+            set.intersection(*[set(l) for l in tv_split]) == set(tv_split[0]),
+            set(test.ids.tolist()) == set(test_attr.index.tolist()),
+            len(test.y) == len(test.ids),
+        )
+    )
     assert all(test_list)
     
 
 #***********************************************************************************  
 def test_create_splitting(caplog):
     """testing factory function to create splitting object"""
-    test = []
-    test.append(isinstance(splitter_random, split.TrainValidTestSplitting))
-    test.append(isinstance(splitter_random.splitter, dc.splits.RandomSplitter))
-    test.append(splitter_random.num_folds == 1)
+    test = [
+        isinstance(splitter_random, split.TrainValidTestSplitting),
+        isinstance(splitter_random.splitter, dc.splits.RandomSplitter),
+        splitter_random.num_folds == 1,
+    ]
     methods = ["get_split_prefix","split_dataset","needs_smiles","split_dataset"]
-    for method in methods:
-        test.append(callable(getattr(splitter_random,method)))
-    test.append(isinstance(splitter_k_fold_scaffold, split.KFoldSplitting))
-    test.append(isinstance(splitter_k_fold_scaffold.splitter, dc.splits.ScaffoldSplitter))
-    test.append(splitter_k_fold_scaffold.num_folds == params_k_fold_scaffold.num_folds)
-    for method in methods:
-        test.append(callable(getattr(splitter_k_fold_scaffold,method)))
+    test.extend(callable(getattr(splitter_random,method)) for method in methods)
+    test.extend(
+        (
+            isinstance(splitter_k_fold_scaffold, split.KFoldSplitting),
+            isinstance(
+                splitter_k_fold_scaffold.splitter, dc.splits.ScaffoldSplitter
+            ),
+            splitter_k_fold_scaffold.num_folds
+            == params_k_fold_scaffold.num_folds,
+        )
+    )
+    test.extend(
+        callable(getattr(splitter_k_fold_scaffold, method))
+        for method in methods
+    )
     assert all(test)
         
 #***********************************************************************************  
@@ -144,7 +189,10 @@ def test_needs_smiles(caplog):
         
 def test_get_split_prefix(caplog):
     """returns a string that identifies the split strategy and the splitting method"""
-    assert splitter_k_fold_scaffold.get_split_prefix(parent='test_fold') == "test_fold/" + str(splitter_k_fold_scaffold.num_folds) + "_fold_cv_" + str(splitter_k_fold_scaffold.split)
+    assert (
+        splitter_k_fold_scaffold.get_split_prefix(parent='test_fold')
+        == f"test_fold/{str(splitter_k_fold_scaffold.num_folds)}_fold_cv_{str(splitter_k_fold_scaffold.split)}"
+    )
     assert splitter_random.get_split_prefix(parent='test_random') == "test_random/" + "train_valid_test_" + str(splitter_random.split)
 
 #***********************************************************************************
@@ -152,17 +200,17 @@ def test_get_split_prefix(caplog):
 def test_split_dataset_random(caplog):
     #Testing for correct type and length of dataset for trainvalidtest splitting with a random splitter
     ([(train,valid)], test_data, [(train_attr,valid_attr)],test_attr) = splitter_random.split_dataset(data_obj_random.dataset, data_obj_random.attr, data_obj_random.params.smiles_col)
-    test = []
-    #corect length of dataset
-    test.append(len(data_obj_random.dataset) == len(train) + len(valid) + len(test_data))
-    #correct size of train set
-    test.append(len(train) == round(len(data_obj_random.dataset)*frac_train))
-    #correct (type) of train, valid, test
-    test.append(isinstance(train, DD) and isinstance(valid, DD) and isinstance(test_data, DD))
-    test.append(len(train.ids) == len(train.y))
-    test.append(len(valid.ids) == len(valid.y))
-    test.append(len(test_data.ids) == len(test_data.y))
-
+    test = [
+        len(data_obj_random.dataset)
+        == len(train) + len(valid) + len(test_data),
+        len(train) == round(len(data_obj_random.dataset) * frac_train),
+        isinstance(train, DD)
+        and isinstance(valid, DD)
+        and isinstance(test_data, DD),
+        len(train.ids) == len(train.y),
+        len(valid.ids) == len(valid.y),
+        len(test_data.ids) == len(test_data.y),
+    ]
     #no overlap in train, valid and test
     full_dataset = sum([train.ids.tolist(),valid.ids.tolist(), test_data.ids.tolist()],[])
     test.append(len(full_dataset) == len(set(full_dataset)))
@@ -179,18 +227,18 @@ def test_split_dataset_random(caplog):
 def test_split_dataset_scaffold(caplog):
     #Testing for correct type and length of dataset for trainvalidtest splitting with a scaffold splitter
     ([(train,valid)], test_data, [(train_attr,valid_attr)],test_attr) = splitter_scaffold.split_dataset(data_obj_scaffold.dataset, data_obj_scaffold.attr, data_obj_scaffold.params.smiles_col)
-    test = []
-    #correct length of dataset
-    test.append(len(data_obj_scaffold.dataset) == len(train) + len(valid) + len(test_data))
-    #correct length of trainiing set
-    test.append(len(train) == round(len(data_obj_scaffold.dataset)*frac_train))
-    #correct (type) for train, valid, test
-    test.append(isinstance(train, DD) and isinstance(valid, DD) and isinstance(test_data, DD))
-    test.append(len(train.ids) == len(train.y))
-    test.append(len(valid.ids) == len(valid.y))
-    test.append(len(test_data.ids) == len(test_data.y))
-    #correct train, valid, test indexing
-    test.append(set(train.ids.tolist()) == set(train_attr.index.tolist()))
+    test = [
+        len(data_obj_scaffold.dataset)
+        == len(train) + len(valid) + len(test_data),
+        len(train) == round(len(data_obj_scaffold.dataset) * frac_train),
+        isinstance(train, DD)
+        and isinstance(valid, DD)
+        and isinstance(test_data, DD),
+        len(train.ids) == len(train.y),
+        len(valid.ids) == len(valid.y),
+        len(test_data.ids) == len(test_data.y),
+        set(train.ids.tolist()) == set(train_attr.index.tolist()),
+    ]
     test.append(set(valid.ids.tolist()) == set(valid_attr.index.tolist()))
     test.append(set(test_data.ids.tolist()) == set(test_attr.index.tolist()))
     #asserting that there are no overlaps in the ids.
@@ -245,34 +293,50 @@ def test_select_attrs_by_dset_smiles():
 #***********************************************************************************
 
 def test_split_dataset_stratified(caplog):
-    #Testing for correct type and length of dataset for trainvalidtest splitting with a random splitter    
-    if stratified_fixed:
-        test_list = []
-        ([(train,valid)], test, [(train_attr,valid_attr)],test_attr) = splitter_stratified.split_dataset(data_obj_stratified.dataset, data_obj_stratified.attr, data_obj_stratified.params.smiles_col)
-        test_list.append(len(data_obj_stratified.dataset) == len(train) + len(valid) + len(test))
-        test_list.append(len(train) == len(train_attr))
-        test_list.append(len(valid) == len(valid_attr))
-        test_list.append(len(test) == len(test_attr))
-        test_list.append(isinstance(train, DD) and isinstance(valid, DD) and isinstance(test, DD))
-        test_list.append(isinstance(train_attr, PDF) and isinstance(valid_attr, PDF) and isinstance(test_attr, PDF))
-        assert all(test_list)
-    else:
-        pass
+    #Testing for correct type and length of dataset for trainvalidtest splitting with a random splitter
+    if not stratified_fixed:
+        return
+    ([(train,valid)], test, [(train_attr,valid_attr)],test_attr) = splitter_stratified.split_dataset(data_obj_stratified.dataset, data_obj_stratified.attr, data_obj_stratified.params.smiles_col)
+    test_list = [
+        len(data_obj_stratified.dataset)
+        == len(train) + len(valid) + len(test),
+        len(train) == len(train_attr),
+        len(valid) == len(valid_attr),
+        len(test) == len(test_attr),
+        (
+            isinstance(train, DD)
+            and isinstance(valid, DD)
+            and isinstance(test, DD)
+        ),
+        (
+            isinstance(train_attr, PDF)
+            and isinstance(valid_attr, PDF)
+            and isinstance(test_attr, PDF)
+        ),
+    ]
+    assert all(test_list)
 
 #***********************************************************************************
 def test_split_dataset_index(caplog):
     #Testing for correct type and length of dataset for trainvalidtest splitting with a random splitter     
     ([(train,valid)], test, [(train_attr,valid_attr)],test_attr) = splitter_index.split_dataset(data_obj_index.dataset, data_obj_index.attr, data_obj_index.params.smiles_col)
-    test_list = []
-    test_list.append(len(data_obj_index.dataset) == len(train) + len(valid) + len(test))
-    test_list.append(len(train) == round(len(data_obj_index.dataset)*frac_train))    
-    test_list.append(isinstance(train, DD) and isinstance(valid, DD) and isinstance(test, DD))
-    test_list.append(set(train.ids.tolist()) == set(train_attr.index.tolist()))
+    test_list = [
+        len(data_obj_index.dataset) == len(train) + len(valid) + len(test),
+        len(train) == round(len(data_obj_index.dataset) * frac_train),
+        isinstance(train, DD)
+        and isinstance(valid, DD)
+        and isinstance(test, DD),
+        set(train.ids.tolist()) == set(train_attr.index.tolist()),
+    ]
     test_list.append(set(valid.ids.tolist()) == set(valid_attr.index.tolist()))
     test_list.append(set(test.ids.tolist()) == set(test_attr.index.tolist()))
-    test_list.append(len(train.ids) == len(train.y))
-    test_list.append(len(valid.ids) == len(valid.y))
-    test_list.append(len(test.ids) == len(test.y))
+    test_list.extend(
+        (
+            len(train.ids) == len(train.y),
+            len(valid.ids) == len(valid.y),
+            len(test.ids) == len(test.y),
+        )
+    )
     full_dataset = sum([train.ids.tolist(),valid.ids.tolist(), test.ids.tolist()],[])
     test_list.append(len(full_dataset) == len(set(full_dataset)))
     assert all(test_list)
@@ -281,16 +345,17 @@ def test_split_dataset_index(caplog):
 def test_split_dataset_kfold_scaffold(caplog):
     #Testing for correct type and length of dataset for k-fold splitting with a scaffold splitter     
     #Testing a 3-fold split first for uniqueness of all validation and training sets. 
-     
+
     splitter_k_fold_scaffold.num_folds = 3
     nf = splitter_k_fold_scaffold.num_folds
     train_valid, test, train_valid_attr, test_attr = splitter_k_fold_scaffold.split_dataset(data_obj_k_fold_scaffold.dataset, data_obj_k_fold_scaffold.attr, data_obj_k_fold_scaffold.params.smiles_col)
     #assert no overlap of the k-fold validation sets between each other
     concat_valid = [x[1].ids.tolist() for x in train_valid]
     concat_valid = sum(concat_valid,[])
-    test_list = []
-    test_list.append(len(concat_valid) == len(set(concat_valid)))
-    test_list.append(not list(set(concat_valid) & set(test.ids.tolist())))
+    test_list = [
+        len(concat_valid) == len(set(concat_valid)),
+        not list(set(concat_valid) & set(test.ids.tolist())),
+    ]
     tv_split = []
     #asserting that each k-fold split has no internal overlap.
     for kfoldindex in range(0,nf):
@@ -305,7 +370,7 @@ def test_split_dataset_kfold_scaffold(caplog):
         len_valid = round(len(current_tv_split)/nf)
         test_list.append(len_valid -1 <= len(train_valid[kfoldindex][1]) <= len_valid + 1)
         tv_split.append(current_tv_split)
-        
+
     #asserting that all k-fold train valid sets are equivalent
     test_list.append(set.intersection(*[set(l) for l in tv_split]) == set(tv_split[0]))
     #aasserting that the test and test_attrs have the same index:
@@ -323,9 +388,10 @@ def test_split_dataset_kfold_random(caplog):
     #assert no overlap of the k-fold validation sets between each other
     concat_valid = [x[1].ids.tolist() for x in train_valid]
     concat_valid = sum(concat_valid,[])
-    test_list = []
-    test_list.append(len(concat_valid) == len(set(concat_valid)))
-    test_list.append(not list(set(concat_valid) & set(test.ids.tolist())))
+    test_list = [
+        len(concat_valid) == len(set(concat_valid)),
+        not list(set(concat_valid) & set(test.ids.tolist())),
+    ]
     tv_split = []
     #asserting that each k-fold split has no internal overlap.
     for kfoldindex in range(0,nf):
@@ -338,7 +404,7 @@ def test_split_dataset_kfold_random(caplog):
         len_valid = round(len(current_tv_split)/nf)
         test_list.append(len_valid -1 <= len(train_valid[kfoldindex][1]) <= len_valid + 1)
         tv_split.append(current_tv_split)
-        
+
     #asserting that all k-fold train valid sets are equivalent
     test_list.append(set.intersection(*[set(l) for l in tv_split]) == set(tv_split[0]))
     #aasserting that the test and test_attrs have the same index:

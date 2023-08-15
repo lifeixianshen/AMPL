@@ -60,7 +60,7 @@ def plot_dataset_dist_distr(dataset, feat_type, dist_metric, task_name, **metric
     y_plt = dist_pdf(x_plt)
     fig, ax = plt.subplots(figsize=(8.0,8.0))
     ax.plot(x_plt, y_plt, color='forestgreen')
-    ax.set_xlabel('%s distance' % dist_metric)
+    ax.set_xlabel(f'{dist_metric} distance')
     ax.set_ylabel('Density')
     ax.set_title("%s dataset\nDistribution of %s distances between %s feature vectors" % (
                   task_name, dist_metric, feat_type))
@@ -121,7 +121,7 @@ def diversity_plots(dset_key, datastore=True, bucket='gsk_ml', title_prefix=None
         dist_df = dist_df.sort_values(by='dist')
         print(dist_df.head(10))
         if out_dir is not None:
-            dist_df.to_csv('%s/%s_mcs_dist_table.csv' % (out_dir, file_prefix), index=False)
+            dist_df.to_csv(f'{out_dir}/{file_prefix}_mcs_dist_table.csv', index=False)
             for k in range(10):
                 mol_i = base_mols[dist_df.i.values[k]]
                 mol_j = base_mols[dist_df.j.values[k]]
@@ -129,32 +129,32 @@ def diversity_plots(dset_key, datastore=True, bucket='gsk_ml', title_prefix=None
                 img_file_j = '%s/%d_%s.png' % (out_dir, k, compound_ids[dist_df.j.values[k]])
                 Draw.MolToFile(mol_i, img_file_i, size=(500,500), fitImage=False)
                 Draw.MolToFile(mol_j, img_file_j, size=(500,500), fitImage=False)
-    
+
         mcs_linkage = linkage(mcs_dist, method='complete')
         mcs_df = pd.DataFrame(mcs_dist, columns=compound_ids, index=compound_ids)
         if out_dir is not None:
-            pdf_path = '%s/%s_mcs_clustermap.pdf' % (out_dir, file_prefix)
+            pdf_path = f'{out_dir}/{file_prefix}_mcs_clustermap.pdf'
             pdf = PdfPages(pdf_path)
         g = sns.clustermap(mcs_df, row_linkage=mcs_linkage, col_linkage=mcs_linkage, figsize=(12,12), cmap='plasma')
         if out_dir is not None:
             pdf.savefig(g.fig)
             pdf.close()
-    
+
         # Draw a UMAP projection based on MCS distance
         mapper = umap.UMAP(n_neighbors=10, n_components=2, metric='precomputed', random_state=17)
         reps = mapper.fit_transform(mcs_dist)
         rep_df = pd.DataFrame.from_records(reps, columns=['x', 'y'])
         rep_df['compound_id'] = compound_ids
         if out_dir is not None:
-            pdf_path = '%s/%s_mcs_umap_proj.pdf' % (out_dir, file_prefix)
+            pdf_path = f'{out_dir}/{file_prefix}_mcs_umap_proj.pdf'
             pdf = PdfPages(pdf_path)
         fig, ax = plt.subplots(figsize=(12,12))
         sns.scatterplot(x='x', y='y', data=rep_df, ax=ax)
-        ax.set_title("%s, 2D projection based on MCS distance" % title_prefix)
+        ax.set_title(f"{title_prefix}, 2D projection based on MCS distance")
         if out_dir is not None:
             pdf.savefig(fig)
             pdf.close()
-            rep_df.to_csv('%s/%s_mcs_umap_proj.csv' % (out_dir, file_prefix), index=False)
+            rep_df.to_csv(f'{out_dir}/{file_prefix}_mcs_umap_proj.csv', index=False)
 
     # Get Tanimoto distance matrix
     print("Computing Tanimoto distance matrix...")
@@ -166,11 +166,11 @@ def diversity_plots(dset_key, datastore=True, bucket='gsk_ml', title_prefix=None
     rep_df = pd.DataFrame.from_records(reps, columns=['x', 'y'])
     rep_df['compound_id'] = compound_ids
     if out_dir is not None:
-        pdf_path = '%s/%s_tani_umap_proj.pdf' % (out_dir, file_prefix)
+        pdf_path = f'{out_dir}/{file_prefix}_tani_umap_proj.pdf'
         pdf = PdfPages(pdf_path)
     fig, ax = plt.subplots(figsize=(12,12))
     sns.scatterplot(x='x', y='y', data=rep_df, ax=ax)
-    ax.set_title("%s, 2D projection based on Tanimoto distance" % title_prefix)
+    ax.set_title(f"{title_prefix}, 2D projection based on Tanimoto distance")
     if out_dir is not None:
         pdf.savefig(fig)
         pdf.close()
@@ -179,7 +179,7 @@ def diversity_plots(dset_key, datastore=True, bucket='gsk_ml', title_prefix=None
     tani_linkage = linkage(tani_dist, method='complete')
     tani_df = pd.DataFrame(tani_dist, columns=compound_ids, index=compound_ids)
     if out_dir is not None:
-        pdf_path = '%s/%s_tanimoto_clustermap.pdf' % (out_dir, file_prefix)
+        pdf_path = f'{out_dir}/{file_prefix}_tanimoto_clustermap.pdf'
         pdf = PdfPages(pdf_path)
     g = sns.clustermap(tani_df, row_linkage=tani_linkage, col_linkage=tani_linkage, figsize=(12,12), cmap='plasma')
     if out_dir is not None:
@@ -223,7 +223,7 @@ def obach_diversity_plots(ecfp_radius=6):
     os.makedirs(out_dir, exist_ok=True)
     file_prefix = 'obach'
     title_prefix = 'Obach PK compound set'
-    id_col = 'Name' 
+    id_col = 'Name'
     smiles_col='rdkit_smiles'
 
 
@@ -257,16 +257,18 @@ def obach_diversity_plots(ecfp_radius=6):
     rep_df = pd.DataFrame.from_records(reps, columns=['x', 'y'])
     rep_df['compound_id'] = compound_ids
     if out_dir is not None:
-        pdf_path = '%s/%s_tani_umap_proj.pdf' % (out_dir, file_prefix)
+        pdf_path = f'{out_dir}/{file_prefix}_tani_umap_proj.pdf'
         pdf = PdfPages(pdf_path)
     fig, ax = plt.subplots(figsize=(12,12))
     sns.scatterplot(x='x', y='y', data=rep_df, ax=ax)
-    ax.set_title("%s, 2D projection based on Tanimoto distance" % title_prefix)
+    ax.set_title(f"{title_prefix}, 2D projection based on Tanimoto distance")
 
     main_rep_df = rep_df[(rep_df.x > -20) & (rep_df.y > -20)]
     fig, ax = plt.subplots(figsize=(12,12))
     sns.scatterplot(x='x', y='y', data=main_rep_df, ax=ax)
-    ax.set_title("%s, main portion, 2D projection based on Tanimoto distance" % title_prefix)
+    ax.set_title(
+        f"{title_prefix}, main portion, 2D projection based on Tanimoto distance"
+    )
     if out_dir is not None:
         pdf.savefig(fig)
 
@@ -276,7 +278,7 @@ def obach_diversity_plots(ecfp_radius=6):
     tani_linkage = linkage(tani_dist, method='complete')
     tani_df = pd.DataFrame(tani_dist, columns=compound_ids, index=compound_ids)
     if out_dir is not None:
-        pdf_path = '%s/%s_tanimoto_clustermap.pdf' % (out_dir, file_prefix)
+        pdf_path = f'{out_dir}/{file_prefix}_tanimoto_clustermap.pdf'
         pdf = PdfPages(pdf_path)
     g = sns.clustermap(tani_df, row_linkage=tani_linkage, col_linkage=tani_linkage, figsize=(12,12), cmap='plasma')
     if out_dir is not None:
@@ -291,13 +293,13 @@ def solubility_diversity_plots(ecfp_radius=6):
     Plot visualizations of diversity for the compounds in the Delaney and GSK aqueous solubility datasets
     """
     data_dir = '/ds/data/gsk_data/GSK_datasets/solubility'
-    cmpd_file = '%s/delaney-processed.csv' % data_dir
+    cmpd_file = f'{data_dir}/delaney-processed.csv'
     out_dir = '/usr/local/data/diversity_plots/solubility'
     os.makedirs(out_dir, exist_ok=True)
     file_prefix = 'delaney'
     title_prefix = 'Delaney solubility compound set'
     diversity_plots(cmpd_file, file_prefix, title_prefix, out_dir=out_dir, ecfp_radius=ecfp_radius, id_col='Compound ID')
-    cmpd_file = '%s/ATOM_GSK_Solubility_Aqueous.csv' % data_dir
+    cmpd_file = f'{data_dir}/ATOM_GSK_Solubility_Aqueous.csv'
     title_prefix = 'GSK Aqueous Solubility compound set'
     file_prefix = 'gsk_aq_sol'
     diversity_plots(cmpd_file, file_prefix, title_prefix, out_dir=out_dir, ecfp_radius=ecfp_radius, id_col='compound_id')

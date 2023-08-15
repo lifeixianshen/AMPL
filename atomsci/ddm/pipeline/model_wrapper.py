@@ -74,7 +74,7 @@ def create_model_wrapper(params, featurizer, ds_client=None):
         else:
             return DCxgboostModelWrapper(params, featurizer, ds_client)
     else:
-        raise ValueError("Unknown model_type %s" % params.model_type)
+        raise ValueError(f"Unknown model_type {params.model_type}")
 
 # ****************************************************************************************
 
@@ -193,19 +193,26 @@ class ModelWrapper(object):
 
             if self.params.datastore:
                 # Save tuple of response and feature transformer lists in datastore
-                self.params.transformer_key = 'transformers_' + self.params.model_uuid + '.pkl'
+                self.params.transformer_key = f'transformers_{self.params.model_uuid}.pkl'
                 try:
-                    fileupload = dsf.upload_pickle_to_DS(data = (self.transformers, self.transformers_x),
-                                    bucket = self.params.transformer_bucket,
-                                    filename = os.path.basename(self.params.transformer_key),
-                                    title = "Saved transformers for dataset %s" % model_dataset.dataset_name,
-                                    description = "Saved transformers for dataset %s" % model_dataset.dataset_name,
-                                    tags = ['transformers', 'pickled', self.params.featurizer.lower(), model_dataset.dataset_name],
-                                    key_values = {'file_category': 'transformers'},
-                                    client = self.ds_client,
-                                    dataset_key = self.params.transformer_key,
-                                    override_check = True,
-                                    return_metadata=True)
+                    fileupload = dsf.upload_pickle_to_DS(
+                        data=(self.transformers, self.transformers_x),
+                        bucket=self.params.transformer_bucket,
+                        filename=os.path.basename(self.params.transformer_key),
+                        title=f"Saved transformers for dataset {model_dataset.dataset_name}",
+                        description=f"Saved transformers for dataset {model_dataset.dataset_name}",
+                        tags=[
+                            'transformers',
+                            'pickled',
+                            self.params.featurizer.lower(),
+                            model_dataset.dataset_name,
+                        ],
+                        key_values={'file_category': 'transformers'},
+                        client=self.ds_client,
+                        dataset_key=self.params.transformer_key,
+                        override_check=True,
+                        return_metadata=True,
+                    )
                     self.params.transformer_oid = fileupload['dataset_oid']
 
                 except Exception as e:
@@ -213,7 +220,7 @@ class ModelWrapper(object):
             else:
                 self.params.transformer_key = os.path.join(self.output_dir, 'transformers.pkl')
                 pickle.dump((self.transformers, self.transformers_x), open(self.params.transformer_key, 'wb'))
-                self.log.info("Wrote transformers to %s" % self.params.transformer_key)
+                self.log.info(f"Wrote transformers to {self.params.transformer_key}")
                 self.params.transformer_bucket = self.params.bucket
 
         # ****************************************************************************************
@@ -475,8 +482,9 @@ class DCNNModelWrapper(ModelWrapper):
                     self.params.layer_sizes = [200, 100]
                 else:
                     # Shouldn't happen
-                    self.log.warning("You need to define default layer sizes for featurizer %s" %
-                                     self.params.featurizer)
+                    self.log.warning(
+                        f"You need to define default layer sizes for featurizer {self.params.featurizer}"
+                    )
                     self.params.layer_sizes = [1000, 500]
 
             if self.params.dropouts is None:
@@ -657,7 +665,7 @@ class DCNNModelWrapper(ModelWrapper):
         self.valid_perf_data = []
         self.test_perf_data = []
 
-        for ei in range(self.params.max_epochs):
+        for _ in range(self.params.max_epochs):
             self.train_perf_data.append(perf.create_perf_data(self.params.prediction_type, pipeline.data, self.transformers, 'train'))
             self.valid_perf_data.append(perf.create_perf_data(self.params.prediction_type, pipeline.data, self.transformers, 'valid'))
             self.test_perf_data.append(perf.create_perf_data(self.params.prediction_type, pipeline.data, self.transformers, 'test'))
@@ -743,15 +751,14 @@ class DCNNModelWrapper(ModelWrapper):
         with open(chkpt_file, 'r') as chkpt_in:
             chkpt_dict = yaml.load(chkpt_in.read())
         chkpt_prefix = chkpt_dict['model_checkpoint_path']
-        files = [chkpt_file]
-        files.append(os.path.join(self.model_dir, 'model.pickle'))
-        files.append(os.path.join(self.model_dir, '%s.index' % chkpt_prefix))
-        files.append(os.path.join(self.model_dir, '%s.meta' % chkpt_prefix))
-        files = files + glob.glob(os.path.join(self.model_dir, '%s.data-*' % chkpt_prefix))
+        files = [chkpt_file, os.path.join(self.model_dir, 'model.pickle')]
+        files.append(os.path.join(self.model_dir, f'{chkpt_prefix}.index'))
+        files.append(os.path.join(self.model_dir, f'{chkpt_prefix}.meta'))
+        files += glob.glob(os.path.join(self.model_dir, f'{chkpt_prefix}.data-*'))
         self._clean_up_excess_files(dest_dir)
         for file in files:
             shutil.copy2(file, dest_dir)
-        self.log.info("Saved model files to '%s'" % dest_dir)
+        self.log.info(f"Saved model files to '{dest_dir}'")
 
 
     # ****************************************************************************************
@@ -773,7 +780,9 @@ class DCNNModelWrapper(ModelWrapper):
             self.model = fcnet.MultitaskClassifier.load_from_dir(reload_dir)
 
         if self.params.transformers and (self.params.transformer_key is not None):
-            self.log.info("Reloading transformers from file %s" % self.params.transformer_key)
+            self.log.info(
+                f"Reloading transformers from file {self.params.transformer_key}"
+            )
             if self.params.datastore:
                 self.transformers, self.transformers_x = dsf.retrieve_dataset_by_datasetkey(
                     dataset_key = self.params.transformer_key,
@@ -814,7 +823,7 @@ class DCNNModelWrapper(ModelWrapper):
                 epoch = self.params.baseline_epoch - 1
             model_dir = self.baseline_model_dir
         else:
-            raise ValueError("Unknown epoch_label '%s'" % epoch_label)
+            raise ValueError(f"Unknown epoch_label '{epoch_label}'")
         if subset == 'train':
             return self.get_train_valid_pred_results(self.train_perf_data[epoch])
         elif subset == 'valid':
@@ -822,7 +831,7 @@ class DCNNModelWrapper(ModelWrapper):
         elif subset == 'test':
             return self.get_train_valid_pred_results(self.test_perf_data[epoch])
         else:
-            raise ValueError("Unknown dataset subset '%s'" % subset)
+            raise ValueError(f"Unknown dataset subset '{subset}'")
 
     # ****************************************************************************************
     def get_perf_data(self, subset, epoch_label=None):
@@ -857,7 +866,7 @@ class DCNNModelWrapper(ModelWrapper):
                 epoch = self.params.baseline_epoch - 1
             model_dir = self.baseline_model_dir
         else:
-            raise ValueError("Unknown epoch_label '%s'" % epoch_label)
+            raise ValueError(f"Unknown epoch_label '{epoch_label}'")
 
         if subset == 'train':
             return self.train_perf_data[epoch]
@@ -867,7 +876,7 @@ class DCNNModelWrapper(ModelWrapper):
             #return self.get_test_perf_data(model_dir, self.data)
             return self.test_perf_data[epoch]
         else:
-            raise ValueError("Unknown dataset subset '%s'" % subset)
+            raise ValueError(f"Unknown dataset subset '{subset}'")
 
 
 
@@ -898,7 +907,7 @@ class DCNNModelWrapper(ModelWrapper):
         # Current (2.1) DeepChem neural net classification models don't support uncertainties.
         if self.params.uncertainty and self.params.prediction_type == 'classification':
             self.log.warning("Warning: DeepChem neural net models support uncertainty for regression only.")
- 
+
         if self.params.uncertainty and self.params.prediction_type == 'regression':
             # For multitask, predict_uncertainty returns a list of (pred, std) tuples, one for each task.
             # For singletask, it returns one tuple. Convert the result into a pair of ndarrays of shape (ncmpds, ntasks, nclasses).
@@ -922,7 +931,15 @@ class DCNNModelWrapper(ModelWrapper):
                   # Transform the standard deviations, if we can. This is a bit of a hack, but it works for
                 # NormalizationTransformer, since the standard deviations used to scale the data are
                 # stored in the transformer object.
-                if len(self.transformers) == 1 and (isinstance(self.transformers[0], dc.trans.NormalizationTransformer) or isinstance(self.transformers[0],trans.NormalizationTransformerMissingData)):
+                if len(self.transformers) == 1 and (
+                    isinstance(
+                        self.transformers[0],
+                        (
+                            dc.trans.NormalizationTransformer,
+                            trans.NormalizationTransformerMissingData,
+                        ),
+                    )
+                ):
                     y_stds = self.transformers[0].y_stds.reshape((1,ntasks,1))
                     std = std / y_stds
                 pred = dc.trans.undo_transforms(pred, self.transformers)
@@ -955,8 +972,7 @@ class DCNNModelWrapper(ModelWrapper):
                     weight_decay_penalty=self.params.weight_decay_penalty,
                     weight_decay_penalty_type=self.params.weight_decay_penalty_type
         )
-        model_spec_metadata = dict(NNSpecific = nn_metadata)
-        return model_spec_metadata
+        return dict(NNSpecific = nn_metadata)
 
     # ****************************************************************************************
     def _clean_up_excess_files(self, dest_dir):
@@ -1106,15 +1122,17 @@ class DCRFModelWrapper(ModelWrapper):
                                              max_depth=self.params.rf_max_depth,
                                              n_jobs=-1)
             if self.params.transformers:
-                self.log.info("Reloading transformers from file %s" % self.params.transformer_key)
+                self.log.info(
+                    f"Reloading transformers from file {self.params.transformer_key}"
+                )
                 if self.params.datastore:
                     self.transformers, self.transformers_x = dsf.retrieve_dataset_by_datasetkey(dataset_key = self.params.transformer_key,
                                    bucket = self.params.transformer_bucket,
                                    client= self.ds_client )
                 else:
                     self.transformers, self.transformers_x = pickle.load(open( self.params.transformer_key, 'rb' ))
-                # TODO: We shouldn't be reloading the transformers here - that should only happen when we load
-                # TODO: a previously trained model to run predictions on a new dataset.
+                        # TODO: We shouldn't be reloading the transformers here - that should only happen when we load
+                        # TODO: a previously trained model to run predictions on a new dataset.
         else:
             rf_model = RandomForestClassifier(n_estimators=self.params.rf_estimators,
                                               max_features=self.params.rf_max_features,
@@ -1150,7 +1168,7 @@ class DCRFModelWrapper(ModelWrapper):
         elif subset == 'full':
             return self.get_full_dataset_pred_results(self.data)
         else:
-            raise ValueError("Unknown dataset subset '%s'" % subset)
+            raise ValueError(f"Unknown dataset subset '{subset}'")
 
 
     # ****************************************************************************************
@@ -1178,7 +1196,7 @@ class DCRFModelWrapper(ModelWrapper):
         elif subset == 'full':
             return self.get_full_dataset_perf_data(self.data)
         else:
-            raise ValueError("Unknown dataset subset '%s'" % subset)
+            raise ValueError(f"Unknown dataset subset '{subset}'")
 
 
     # ****************************************************************************************
@@ -1203,12 +1221,16 @@ class DCRFModelWrapper(ModelWrapper):
             if self.params.prediction_type == 'regression':
                 rf_model = joblib.load(os.path.join(self.best_model_dir, 'model.joblib'))
                 ## s.d. from forest
-                if self.params.transformers and self.transformers is not None:
-                    RF_per_tree_pred = [dc.trans.undo_transforms(
-                        tree.predict(dataset.X), self.transformers) for tree in rf_model.estimators_]
-                else:
-                    RF_per_tree_pred = [tree.predict(dataset.X) for tree in rf_model.estimators_]
-
+                RF_per_tree_pred = (
+                    [
+                        dc.trans.undo_transforms(
+                            tree.predict(dataset.X), self.transformers
+                        )
+                        for tree in rf_model.estimators_
+                    ]
+                    if self.params.transformers and self.transformers is not None
+                    else [tree.predict(dataset.X) for tree in rf_model.estimators_]
+                )
                 # Don't need to "untransform" standard deviations here, since they're calculated from
                 # the untransformed per-tree predictions.
                 std = np.array([np.std(col) for col in zip(*RF_per_tree_pred)]).reshape((ncmpds,1,-1))
@@ -1216,10 +1238,9 @@ class DCRFModelWrapper(ModelWrapper):
                 # We can estimate uncertainty for binary classifiers, but not multiclass (yet)
                 nclasses = pred.shape[2]
                 if nclasses == 2:
-                    ntrees = self.params.rf_estimators
                     # Use normal approximation to binomial sampling error. Later we can do Jeffrey's interval if we
                     # want to get fancy.
-                    std = np.sqrt(pred * (1-pred) / ntrees)
+                    std = np.sqrt(pred * (1-pred) / self.params.rf_estimators)
                 else:
                     self.log.warning("Warning: Random forest only supports uncertainties for binary classifiers.")
 
@@ -1239,8 +1260,7 @@ class DCRFModelWrapper(ModelWrapper):
             'rf_max_features': self.params.rf_max_features,
             'rf_max_depth': self.params.rf_max_depth
         }
-        model_spec_metadata = dict(RFSpecific = rf_metadata)
-        return model_spec_metadata
+        return dict(RFSpecific = rf_metadata)
     
     # ****************************************************************************************
     def _clean_up_excess_files(self, dest_dir):
@@ -1452,7 +1472,9 @@ class DCxgboostModelWrapper(ModelWrapper):
 #                                          tree_method = 'gpu_hist'
                                          )
             if self.params.transformers:
-                self.log.warning("Reloading transformers from file %s" % self.params.transformer_key)
+                self.log.warning(
+                    f"Reloading transformers from file {self.params.transformer_key}"
+                )
                 if self.params.datastore:
                     self.transformers, self.transformers_x = dsf.retrieve_dataset_by_datasetkey(
                         dataset_key=self.params.transformer_key,
@@ -1460,8 +1482,8 @@ class DCxgboostModelWrapper(ModelWrapper):
                         client=self.ds_client)
                 else:
                     self.transformers, self.transformers_x = pickle.load(open(self.params.transformer_key, 'rb'))
-                # TODO: We shouldn't be reloading the transformers here - that should only happen when we load
-                # TODO: a previously trained model to run predictions on a new dataset.
+                        # TODO: We shouldn't be reloading the transformers here - that should only happen when we load
+                        # TODO: a previously trained model to run predictions on a new dataset.
         else:
             xgb_model = xgb.XGBClassifier(max_depth=self.params.xgb_max_depth,
                                          learning_rate=self.params.xgb_learning_rate,
@@ -1518,7 +1540,7 @@ class DCxgboostModelWrapper(ModelWrapper):
         elif subset == 'full':
             return self.get_full_dataset_pred_results(self.data)
         else:
-            raise ValueError("Unknown dataset subset '%s'" % subset)
+            raise ValueError(f"Unknown dataset subset '{subset}'")
 
     # ****************************************************************************************
     def get_perf_data(self, subset, epoch_label=None):
@@ -1546,7 +1568,7 @@ class DCxgboostModelWrapper(ModelWrapper):
         elif subset == 'full':
             return self.get_full_dataset_perf_data(self.data)
         else:
-            raise ValueError("Unknown dataset subset '%s'" % subset)
+            raise ValueError(f"Unknown dataset subset '{subset}'")
 
     # ****************************************************************************************
     def generate_predictions(self, dataset):
@@ -1588,8 +1610,7 @@ class DCxgboostModelWrapper(ModelWrapper):
                        "xgb_subsample" : self.params.xgb_subsample,
                        "xgb_colsample_bytree"  :self.params.xgb_colsample_bytree
                         }
-        model_spec_metadata = dict(xgbSpecific=xgb_metadata)
-        return model_spec_metadata
+        return dict(xgbSpecific=xgb_metadata)
 
     # ****************************************************************************************
     def _clean_up_excess_files(self, dest_dir):

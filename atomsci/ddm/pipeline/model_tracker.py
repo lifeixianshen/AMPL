@@ -89,7 +89,7 @@ def save_model(pipeline, collection_name='model_tracker', log=True):
     metadata_dict['collection_name'] = collection_name
     client_wrapper.save_metadata(model_metadata_dict=metadata_dict)
     if log:
-        print('Successfully inserted into the database with model_uuid %s.' % model_uuid)
+        print(f'Successfully inserted into the database with model_uuid {model_uuid}.')
 
 # *********************************************************************************************************************************
 def get_models(filter_dict, client_wrapper=None, collection_name='model_tracker', log=False):

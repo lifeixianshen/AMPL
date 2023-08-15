@@ -1,6 +1,7 @@
 ''' This file contains functions to make it easier to browse and retrieve data from the datastore.
     Intended for general use. Add/modify functions as needed. Created 23Jul18 CHW'''
 
+
 # -------------setup section-----------------
 
 import sys
@@ -26,7 +27,7 @@ import getpass
 feather_supported = True
 try:
     import feather
-except (ImportError, AttributeError, ModuleNotFoundError):
+except (ImportError, AttributeError):
     feather_supported = False
 
 datastore_supported = True
@@ -34,7 +35,7 @@ try:
     from atomsci.clients import DatastoreClient
     from atomsci.clients import DatastoreClientSingleton
     from atomsci.clients import MLMTClient
-except (ModuleNotFoundError, ImportError):
+except ImportError:
     logger.info("DatastoreClient not installed in your environment. Try 'pip install clients --user' to install. When available.")
     datastore_supported = False
 
@@ -61,10 +62,9 @@ def config_client(
     token_str = None
     if 'DATASTORE_API_TOKEN' in os.environ:
         token_str = os.environ['DATASTORE_API_TOKEN']
-    else:
-        if os.path.exists(token):
-            with open(token,'r') as f:
-                token_str = f.readline().strip()
+    elif os.path.exists(token):
+        with open(token,'r') as f:
+            token_str = f.readline().strip()
 
     if new_instance:
         client = DatastoreClient(default_url=url,
@@ -75,8 +75,8 @@ def config_client(
 
     if not client.api_token:
         if not token_str:
-            logger.error("token file not found: {}".format(token))
-            
+            logger.error(f"token file not found: {token}")
+
         logger.error("and none of {} token env vars set".format(",".join(
             DatastoreClient.api_token_env_str)))
 
@@ -169,11 +169,11 @@ def retrieve_keys(bucket='all', client=None, sort=True):
         all_buckets = retrieve_bucket_names(client)
         valid_buckets = [i for i in all_buckets if i in bucket] #compares the list of 'valid' buckets with the requested list
 
-        if (len(valid_buckets) > 0) and (len(valid_buckets) < len(bucket)):
+        if valid_buckets and len(valid_buckets) < len(bucket):
             print("Not all buckets requested all valid buckets. Keys will be retrieved for the following buckets:")
             bucket = valid_buckets
             print(bucket)
-        if len(valid_buckets) == 0:
+        if not valid_buckets:
             print("Requested bucket(s) are not valid.")
             return
         keys = client.ds_metadef.get_metadata_keys(bucket_names = bucket).result()
@@ -207,15 +207,14 @@ def key_exists(key, bucket='all', client=None):
         if type(bucket) == str:
             bucket = [bucket]
 
-         # check if requested buckets are valid bucket names
         all_buckets = retrieve_bucket_names(client)
         valid_buckets = [i for i in all_buckets if i in bucket] #compares the list of 'valid' buckets with the requested list
 
-        if (len(valid_buckets) > 0) and (len(valid_buckets) < len(bucket)):
+        if valid_buckets and len(valid_buckets) < len(bucket):
             print("Not all buckets requested all valid buckets. Keys will be retrieved for the following buckets:")
             bucket = valid_buckets
             print(bucket)
-        if len(valid_buckets) == 0:
+        if not valid_buckets:
             raise ValueError("Requested bucket(s) are not valid.")
 
         # generate list of valid keys for bucket(s) specified
@@ -246,13 +245,10 @@ def retrieve_values_for_key(key, bucket='all', client=None):
     if bucket == 'all':
         # evaluate if key is valid
         all_keys = retrieve_keys()
-        if not key in all_keys:
+        if key not in all_keys:
             raise ValueError('specified key does not exist')
 
         values = client.ds_metadef.get_metadata_key_values(key=key).result()
-        value_type = values['value_types']
-        values = values['values']
-
     else:
         if type(bucket) == str:
             bucket = [bucket]
@@ -261,17 +257,17 @@ def retrieve_values_for_key(key, bucket='all', client=None):
         for i in bucket:
             bucket_name = i
             all_buckets = retrieve_bucket_names(client)
-            if not bucket_name in all_buckets:
+            if bucket_name not in all_buckets:
                 raise ValueError('bucket does not exist')
 
         # evaluate if key is valid
         all_keys = retrieve_keys(bucket=bucket)
-        if not key in all_keys:
+        if key not in all_keys:
             raise ValueError('specified key does not exist in bucket(s) specified')
 
         values = client.ds_metadef.get_metadata_key_values(key=key, bucket_names = bucket).result()
-        value_type = values['value_types']
-        values = values['values']
+    value_type = values['value_types']
+    values = values['values']
 
     if value_type == ['str']:
         values = sorted(values, key = str.lower)
@@ -299,7 +295,7 @@ def dataset_key_exists(dataset_key, bucket, client=None):
 
     # check that bucket exists
     all_buckets = retrieve_bucket_names(client)
-    if not bucket in all_buckets:
+    if bucket not in all_buckets:
         raise ValueError('bucket does not exist')
 
     # check that dataset_key exists in bucket
@@ -336,7 +332,7 @@ def retrieve_dataset_by_datasetkey(dataset_key, bucket, client=None, return_meta
 
     # check that bucket exists
     all_buckets = retrieve_bucket_names(client)
-    if not bucket in all_buckets:
+    if bucket not in all_buckets:
         raise ValueError('bucket does not exist')
 
     # check that dataset_key exists in bucket
@@ -391,8 +387,7 @@ def retrieve_dataset_by_datasetkey(dataset_key, bucket, client=None, return_meta
         if not sep:
             dataset = pd.read_csv(fp,nrows=nrows, index_col=index_col, **kwargs)
         else:
-            dataset = pd.read_csv(fp, nrows=nrows, sep=sep, index_col=index_col, **kwargs)\
-
+            dataset = pd.read_csv(fp, nrows=nrows, sep=sep, index_col=index_col, **kwargs)
     elif file_type == 'feather':
         # feather file. Return as dataframe.
         if not feather_supported:
@@ -407,7 +402,7 @@ def retrieve_dataset_by_datasetkey(dataset_key, bucket, client=None, return_meta
                 break
             logger.debug("Read %d bytes of data from datastore" % len(data))
             tmp_fp.write(data)
-        logger.debug("Wrote data to %s" % tmp_path)
+        logger.debug(f"Wrote data to {tmp_path}")
         tmp_fp.close()
         fp.close()
         logger.debug("Reading data into data frame")
@@ -415,16 +410,16 @@ def retrieve_dataset_by_datasetkey(dataset_key, bucket, client=None, return_meta
         logger.debug("Done")
         os.unlink(tmp_path)
 
-    elif file_type == 'xls' or file_type == 'xlsx':
+    elif file_type in ['xls', 'xlsx']:
         # xls or xlsx file. Return as a ordered dictionary
         fp = client.open_bucket_dataset (bucket, dataset_key, mode='b')
         dataset = pd.read_excel(fp, sheet_name=None)
         num_sheets = len(dataset)
         sheet_names = dataset.keys()
-        print('Excel workbook has %s sheets' %(num_sheets), 'Sheet names = ', sheet_names)
+        print(f'Excel workbook has {num_sheets} sheets', 'Sheet names = ', sheet_names)
         print('tip: use OrderedDict.get(sheet_name) to extract a specific sheet')
 
-    elif file_type == 'gz' or file_type == 'tgz':
+    elif file_type in ['gz', 'tgz']:
         # tar.gz (tarball) file. Extract to path specified and return path.
         fp = client.open_bucket_dataset (bucket, dataset_key, mode='b')
         fp = tarfile.open(fileobj=fp, mode='r:gz')
@@ -518,16 +513,16 @@ def retrieve_dataset_by_dataset_oid(dataset_oid, client=None, return_metadata=Fa
         else:
             dataset = pd.read_csv(fp, nrows=nrows, sep=sep, index_col=index_col)
 
-    elif file_type == 'xls' or file_type == 'xlsx':
+    elif file_type in ['xls', 'xlsx']:
         # xls or xlsx file. Return as a ordered dictionary
         fp = client.open_dataset (dataset_oid, mode='b')
         dataset = pd.read_excel(fp, sheet_name=None)
         num_sheets = len(dataset)
         sheet_names = dataset.keys()
-        print('Excel workbook has %s sheets' %(num_sheets), 'Sheet names = ', sheet_names)
+        print(f'Excel workbook has {num_sheets} sheets', 'Sheet names = ', sheet_names)
         print('tip: use OrderedDict.get(sheet_name) to extract a specific sheet')
 
-    elif file_type == 'gz' or file_type == 'tgz':
+    elif file_type in ['gz', 'tgz']:
         # tar.gz (tarball) file. Extract to path specified and return path.
         fp = client.open_dataset (dataset_oid, mode='b')
         fp = tarfile.open(fileobj=fp, mode='r:gz')
@@ -575,7 +570,7 @@ def search_datasets_by_key_value(key, value, client=None, operator='in', bucket=
     if bucket == 'all':
         # evaluate if key is valid
         all_keys = retrieve_keys()
-        if not key in all_keys:
+        if key not in all_keys:
             raise ValueError('specified key does not exist')
 
         datasets = client.ds_datasets.get_datasets(metadata=metadata).result()
@@ -587,12 +582,12 @@ def search_datasets_by_key_value(key, value, client=None, operator='in', bucket=
         all_buckets = retrieve_bucket_names(client)
         for i in bucket:
             bucket_name = i
-            if not bucket_name in all_buckets:
+            if bucket_name not in all_buckets:
                 raise ValueError('bucket does not exist')
 
         # evaluate if key is valid
         all_keys = retrieve_keys(bucket=bucket)
-        if not key in all_keys:
+        if key not in all_keys:
             raise ValueError('specified key does not exist in bucket(s) specified')
 
 
@@ -602,18 +597,17 @@ def search_datasets_by_key_value(key, value, client=None, operator='in', bucket=
 
     if len(datasets) == 0:
         print('No datasets found matching criteria specified',key,value)
-    else:
-        if not display_all_columns:
-            col = ['bucket_name', 'title', 'dataset_oid', 'dataset_key', 'description',
-                   'metadata', 'tags', 'user_perm', 'active', 'versions']
-            datasets = datasets[col]
+    elif not display_all_columns:
+        col = ['bucket_name', 'title', 'dataset_oid', 'dataset_key', 'description',
+               'metadata', 'tags', 'user_perm', 'active', 'versions']
+        datasets = datasets[col]
 
     return datasets
 
 
 #-------------------------------------------------------------------------------------------------------
    # extracted this function (with small modifications) from join.ipynb
-def retrieve_columns_from_dataset (bucket, dataset_key, client=None, max_rows=0, column_names='', return_names=False):
+def retrieve_columns_from_dataset(bucket, dataset_key, client=None, max_rows=0, column_names='', return_names=False):
 
     """Retrieve column(s) from csv file (may be bz2 compressed) in datastore.
        'NA' returned if column not in file (as well as warning message).
@@ -633,7 +627,6 @@ def retrieve_columns_from_dataset (bucket, dataset_key, client=None, max_rows=0,
     if not isinstance (column_names, list):
         if not isinstance (column_names, str):
             raise TypeError ('get_columns_csv: Second argument should be column name or list of column names', file=sys.stderr)
-            sys.exit (1)
         else:
             column_names = [column_names]
 
@@ -659,11 +652,7 @@ def retrieve_columns_from_dataset (bucket, dataset_key, client=None, max_rows=0,
 
     dict_reader = csv.DictReader (fp)
 
-    # Set up dict to be returned.
-    selected_columns = {}
-    for column_name in column_names:
-        selected_columns[column_name] = []
-
+    selected_columns = {column_name: [] for column_name in column_names}
     # Check which columns in this file.
     header_names = dict_reader.fieldnames
 

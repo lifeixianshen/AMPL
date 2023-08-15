@@ -117,7 +117,7 @@ def test():
     # -----------------------------
     model_dir = 'result/delaney-processed_curated_fit/RF_computed_descriptors_scaffold_regression'
     uuid = integrative_utilities.get_subdirectory(model_dir)
-    reload_dir = model_dir+'/'+uuid
+    reload_dir = f'{model_dir}/' + uuid
 
     # Check training statistics
     # -------------------------

@@ -42,46 +42,43 @@ def calc_dist_smiles(
         # TODO: Handle other metrics for fingerprints, as in calc_dist_diskdataset()
         mols1 = [Chem.MolFromSmiles(s) for s in smiles_arr1]
         fprints1 = [AllChem.GetMorganFingerprintAsBitVect(mol, 2, 1024) for mol in mols1]
-        if smiles_arr2 is not None:
-            if len(smiles_arr2) == 1:
-                cpd_mol = Chem.MolFromSmiles(smiles_arr2[0])
-                cpd_fprint = AllChem.GetMorganFingerprintAsBitVect(cpd_mol, 2, 1024)
-                # Vector of distances
-                return calc_summary(dist_metrics.tanimoto_single(cpd_fprint, fprints1)[0], calc_type, 
-                                    num_nearest, within_dset)
-            else:
-                mols2 = [Chem.MolFromSmiles(s) for s in smiles_arr2]
-                fprints2 = [AllChem.GetMorganFingerprintAsBitVect(mol, 2, 1024) for mol in mols2]
-        else:
+        if smiles_arr2 is None:
             fprints2 = None
             within_dset = True
+        elif len(smiles_arr2) == 1:
+            cpd_mol = Chem.MolFromSmiles(smiles_arr2[0])
+            cpd_fprint = AllChem.GetMorganFingerprintAsBitVect(cpd_mol, 2, 1024)
+            # Vector of distances
+            return calc_summary(dist_metrics.tanimoto_single(cpd_fprint, fprints1)[0], calc_type, 
+                                num_nearest, within_dset)
+        else:
+            mols2 = [Chem.MolFromSmiles(s) for s in smiles_arr2]
+            fprints2 = [AllChem.GetMorganFingerprintAsBitVect(mol, 2, 1024) for mol in mols2]
         return calc_summary(dist_metrics.tanimoto(fprints1, fprints2), calc_type, num_nearest, within_dset)
-        
+
     elif dist_met == 'mcs':
         mols1 = [Chem.MolFromSmiles(s) for s in smiles_arr1]
         n_atms = [mol.GetNumAtoms() for mol in mols1]
-        if smiles_arr2 is not None:
-            if len(smiles_arr2) == 1:
-                cpd_mol = Chem.MolFromSmiles(smiles_arr2[0])
-                # Vector of distances
-                return calc_summary(dist_metrics.mcs_single(
-                    cpd_mol, mols1, n_atms)[0], calc_type, num_nearest, within_dset)
-            else:
-                mols2 = [Chem.MolFromSmiles(s) for s in smiles_arr2]
-        else:
+        if smiles_arr2 is None:
             mols2 = None
+        elif len(smiles_arr2) == 1:
+            cpd_mol = Chem.MolFromSmiles(smiles_arr2[0])
+            # Vector of distances
+            return calc_summary(dist_metrics.mcs_single(
+                cpd_mol, mols1, n_atms)[0], calc_type, num_nearest, within_dset)
+        else:
+            mols2 = [Chem.MolFromSmiles(s) for s in smiles_arr2]
         return calc_summary(dist_metrics.mcs(mols1, mols2), calc_type, num_nearest, within_dset=True)
-    
+
     elif feat_type in ['descriptors', 'moe']:
         feats1 = get_descriptors(smiles_arr1)
         if feats1 is not None:
-            if smiles_arr2 is not None:
-                feats2 = get_descriptors(smiles_arr2)
-                if feats2 is None:
-                    return
-                return calc_summary(cdist(feats1, feats2, dist_met), calc_type, num_nearest, within_dset)
-            else:
+            if smiles_arr2 is None:
                 return calc_summary(pdist(feats1, dist_met, **metric_kwargs), calc_type, num_nearest, within_dset=True)
+            feats2 = get_descriptors(smiles_arr2)
+            if feats2 is None:
+                return
+            return calc_summary(cdist(feats1, feats2, dist_met), calc_type, num_nearest, within_dset)
 
 
 def calc_dist_diskdataset(
@@ -134,22 +131,19 @@ def calc_dist_feat_array(feat_type, dist_met, feat1, feat2=None, calc_type='near
 
     """
     within_dset = False
-    if feat_type in ['ECFP', 'ecfp']:
-        if dist_met == 'tanimoto':
-            if feat2 is not None:
-                if feat2.shape[0] == 1:
-                    # Vector of distances
-                    return calc_summary(dist_metrics.tanimoto_single(feat2, feat1)[0], calc_type, 
-                                        num_nearest)
-                return calc_summary(dist_metrics.tanimoto(feat1, feat2), calc_type, num_nearest)
-            else:
-                return calc_summary(dist_metrics.tanimoto(feat1), calc_type, num_nearest, within_dset=True)
-        else:
-            if feat2 is not None:
-                return calc_summary(cdist(feat1, feat2, dist_met), calc_type, num_nearest)
-            return calc_summary(pdist(feat1, dist_met, **metric_kwargs), calc_type, num_nearest, within_dset=True)
-
-    elif feat_type == 'descriptors':
+    if (
+        feat_type in ['ECFP', 'ecfp']
+        and dist_met == 'tanimoto'
+        and feat2 is not None
+    ):
+        if feat2.shape[0] == 1:
+            # Vector of distances
+            return calc_summary(dist_metrics.tanimoto_single(feat2, feat1)[0], calc_type, 
+                                num_nearest)
+        return calc_summary(dist_metrics.tanimoto(feat1, feat2), calc_type, num_nearest)
+    elif feat_type in ['ECFP', 'ecfp'] and dist_met == 'tanimoto':
+        return calc_summary(dist_metrics.tanimoto(feat1), calc_type, num_nearest, within_dset=True)
+    elif feat_type in ['ECFP', 'ecfp', 'descriptors']:
         if feat2 is not None:
             return calc_summary(cdist(feat1, feat2, dist_met), calc_type, num_nearest)
         return calc_summary(pdist(feat1, dist_met, **metric_kwargs), calc_type, num_nearest, within_dset=True)
@@ -189,11 +183,7 @@ def calc_summary(dist_arr, calc_type, num_nearest=1, within_dset=False):
     if calc_type == 'all':
         return dist_arr
 
-    if len(dist_arr.shape) == 1:
-        dist_mat = squareform(dist_arr)
-    else:
-        dist_mat = dist_arr
-
+    dist_mat = squareform(dist_arr) if len(dist_arr.shape) == 1 else dist_arr
     if calc_type == 'farthest':
         return dist_mat.max(axis=1)
     if calc_type == 'avg':
@@ -206,27 +196,18 @@ def calc_summary(dist_arr, calc_type, num_nearest=1, within_dset=False):
             nn_dist = nn_dist[:,1:(num_nearest+1)]
         else:
             nn_dist = nn_dist[:,:num_nearest]
-        if num_nearest == 1:
-            return nn_dist[:,0]
-        else:
-            return nn_dist
-
+        return nn_dist[:,0] if num_nearest == 1 else nn_dist
     if calc_type == 'nth_nearest':
         nn_dist = np.sort(dist_mat)
-        if within_dset:
-            return nn_dist[:,num_nearest]
-        else:
-            return nn_dist[:,num_nearest-1]
-
+        return nn_dist[:,num_nearest] if within_dset else nn_dist[:,num_nearest-1]
     if calc_type == 'avg_n_nearest':
-        if within_dset:
-            return np.sort(dist_mat)[:,1:(num_nearest+1)].mean(axis=1)
-        else:
-            return np.sort(dist_mat)[:,:num_nearest].mean(axis=1)
-
-    else:
-        print("calc_type %s is not valid" % calc_type)
-        sys.exit(1)
+        return (
+            np.sort(dist_mat)[:, 1 : (num_nearest + 1)].mean(axis=1)
+            if within_dset
+            else np.sort(dist_mat)[:, :num_nearest].mean(axis=1)
+        )
+    print(f"calc_type {calc_type} is not valid")
+    sys.exit(1)
         
 def get_descriptors(smiles_arr):
     ds_client = dsf.config_client(token='/usr/local/data/ds_token.txt')

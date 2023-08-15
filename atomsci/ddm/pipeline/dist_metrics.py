@@ -104,7 +104,7 @@ def mcs(mols1, mols2=None):
     else:
         dists, sum_incomplete = parallel_dist_multi([mols1, mols2, n_atms1], mcs_single)
     if sum_incomplete:
-        print('{} incomplete MCS searches'.format(sum_incomplete))
+        print(f'{sum_incomplete} incomplete MCS searches')
     return dists
 
 

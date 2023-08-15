@@ -68,25 +68,29 @@ DCNNModelWrapper, DCRFModelWrapper
     mdl = model_wrapper.create_model_wrapper(inp_params, featurization)
     mdl.setup_model_dirs()
     # testing for correct attribute initialization with model_type == "NN"
-    test = []
-    test.append(mdl.params.model_type == 'NN')
-    test.append(isinstance(mdl.featurization,feat.DynamicFeaturization))
-    test.append(mdl.output_dir == inp_params.output_dir)
-    test.append(mdl.model_dir == inp_params.output_dir + '/' + 'model')
-    test.append(mdl.best_model_dir == inp_params.output_dir + '/' + 'best_model')
-    test.append(mdl.baseline_model_dir == inp_params.output_dir + '/' + 'baseline_epoch_model')
-    test.append(mdl.transformers == [])
-    test.append(mdl.transformers_x == [])
-    test.append(isinstance(mdl, model_wrapper.DCNNModelWrapper))
-
+    test = [
+        mdl.params.model_type == 'NN',
+        isinstance(mdl.featurization, feat.DynamicFeaturization),
+        mdl.output_dir == inp_params.output_dir,
+        mdl.model_dir == f'{inp_params.output_dir}/model',
+        mdl.best_model_dir == f'{inp_params.output_dir}/best_model',
+        mdl.baseline_model_dir
+        == f'{inp_params.output_dir}/baseline_epoch_model',
+        mdl.transformers == [],
+        mdl.transformers_x == [],
+        isinstance(mdl, model_wrapper.DCNNModelWrapper),
+    ]
     # testing for correct attribute initialization with model_type == "RF"
     temp_params = copy.deepcopy(inp_params)
     temp_params.model_type = 'RF'
     featurization = feat.create_featurization(temp_params)
     mdl_RF = model_wrapper.create_model_wrapper(temp_params, featurization)
-    test.append(isinstance(mdl_RF, MP.model_wrapper.DCRFModelWrapper))
-    test.append(mdl_RF.params.model_type == 'RF')
-
+    test.extend(
+        (
+            isinstance(mdl_RF, MP.model_wrapper.DCRFModelWrapper),
+            mdl_RF.params.model_type == 'RF',
+        )
+    )
     # assertion for all tests
     assert all(test)
 
@@ -138,12 +142,20 @@ def test_super_create_transformers():
     mdl.setup_model_dirs()
 
     #testing correct model_wrapper build with regression and NN
-    test = []
-    test.append(mdl.params.prediction_type == 'regression')
-    test.append(mdl.params.model_type == 'NN')
+    test = [
+        mdl.params.prediction_type == 'regression',
+        mdl.params.model_type == 'NN',
+    ]
     mdl.create_transformers(data_obj_ecfp)
-    test.append(isinstance(mdl.transformers[0], dc.trans.transformers.NormalizationTransformer))
-    test.append(mdl.transformers_x == [])
+    test.extend(
+        (
+            isinstance(
+                mdl.transformers[0],
+                dc.trans.transformers.NormalizationTransformer,
+            ),
+            mdl.transformers_x == [],
+        )
+    )
     #testing saving of transformer to correct location:
     transformer_path = os.path.join(mdl.output_dir, 'transformers.pkl')
     test.append(os.path.isfile(transformer_path))
@@ -153,8 +165,7 @@ def test_super_create_transformers():
     # TODO: test when transformers is False:
     inp_params.prediction_type = 'classification'
     mdl = model_wrapper.create_model_wrapper(inp_params, featurization)
-    test.append(mdl.transformers == [])
-    test.append(mdl.transformers_x == [])
+    test.extend((mdl.transformers == [], mdl.transformers_x == []))
     assert all(test)
 
 
@@ -191,14 +202,13 @@ def test_super_transform_dataset():
     mdl.create_transformers(data_obj_ecfp)
     dataset = mdl.transform_dataset(data_obj_ecfp.dataset)
 
-    test = []
-    # checking that the dataset is the correct type
-    test.append(isinstance(dataset, DD))
-    # since this is not descriptor featurization, the X values for the datasets should be the same
-    test.append((dataset.X == data_obj_ecfp.dataset.X).all())
-    # and the response values should be the same length:
-    test.append(len(dataset.y) == len(data_obj_ecfp.dataset.y))
-    test.append(len(dataset.y) == len(dataset.ids))
+    test = [isinstance(dataset, DD), (dataset.X == data_obj_ecfp.dataset.X).all()]
+    test.extend(
+        (
+            len(dataset.y) == len(data_obj_ecfp.dataset.y),
+            len(dataset.y) == len(dataset.ids),
+        )
+    )
     assert all(test)
 
 

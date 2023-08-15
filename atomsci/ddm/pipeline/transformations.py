@@ -66,17 +66,17 @@ def create_feature_transformers(params, model_dataset):
         if model_dataset.split_strategy == 'k_fold_cv':
             log.warning("Warning: UMAP transformation may produce misleading results when used with K-fold split strategy.")
         train_dset = model_dataset.train_valid_dsets[0][0]
-        transformers_x = [UMAPTransformer(params, train_dset)]
+        return [UMAPTransformer(params, train_dset)]
     elif params.transformers==True:
         # TODO: Transformers on responses and features should be controlled only by parameters
         # response_transform_type and feature_transform_type, rather than params.transformers.
 
         # Scale and center feature matrix if featurization type calls for it
-        transformers_x = model_dataset.featurization.create_feature_transformer(model_dataset.dataset)
+        return model_dataset.featurization.create_feature_transformer(
+            model_dataset.dataset
+        )
     else:
-        transformers_x = []
-
-    return transformers_x
+        return []
 
 # ****************************************************************************************
 def get_transformer_specific_metadata(params):

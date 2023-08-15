@@ -63,9 +63,9 @@ def extract_collection_perf_metrics(collection_name, output_dir, pred_type='regr
     os.makedirs(output_dir, exist_ok=True)
     for dset_key, bucket in datasets:
         dset_perf_df = get_training_perf_table(dset_key, bucket, collection_name, pred_type=pred_type)
-        dset_perf_file = '%s/%s_%s_model_perf_metrics.csv' % (output_dir, os.path.basename(dset_key).replace('.csv', ''), collection_name)
+        dset_perf_file = f"{output_dir}/{os.path.basename(dset_key).replace('.csv', '')}_{collection_name}_model_perf_metrics.csv"
         dset_perf_df.to_csv(dset_perf_file, index=False)
-        print('Wrote file %s' % dset_perf_file)
+        print(f'Wrote file {dset_perf_file}')
 
 #------------------------------------------------------------------------------------------------------------------
 def get_training_perf_table(dataset_key, bucket, collection_name, pred_type='regression', other_filters = {}):
@@ -78,11 +78,11 @@ def get_training_perf_table(dataset_key, bucket, collection_name, pred_type='reg
     model_filter = {"ModelMetadata.TrainingDataset.dataset_key" : dataset_key,
                    "ModelMetadata.TrainingDataset.bucket" : bucket,
                    "ModelMetrics.TrainingRun.label" : "best",}
-    model_filter.update(other_filters)
-    print("Finding models trained on %s dataset %s" % (bucket, dataset_key))
+    model_filter |= other_filters
+    print(f"Finding models trained on {bucket} dataset {dataset_key}")
     models = list(trkr.get_full_metadata(model_filter, client_wrapper,
                                   collection_name=collection_name))
-    if models == []:
+    if not models:
         print("No matching models returned")
         return
     else:
@@ -104,15 +104,8 @@ def get_training_perf_table(dataset_key, bucket, collection_name, pred_type='reg
     best_epoch_list = []
     max_epochs_list = []
     subsets = ['train', 'valid', 'test']
-    score_dict = {}
-    for subset in subsets:
-        score_dict[subset] = []
-
-    if pred_type == 'regression':
-        metric_type = 'r2_score'
-    else:
-        metric_type = 'roc_auc_score'
-
+    score_dict = {subset: [] for subset in subsets}
+    metric_type = 'r2_score' if pred_type == 'regression' else 'roc_auc_score'
     for metadata_dict in models:
         model_uuid = metadata_dict['model_uuid']
         #print("Got metadata for model UUID %s" % model_uuid)
@@ -121,7 +114,7 @@ def get_training_perf_table(dataset_key, bucket, collection_name, pred_type='reg
         metrics_dicts = metadata_dict['ModelMetrics']['TrainingRun']
         #print("Got %d metrics dicts for model %s" % (len(metrics_dicts), model_uuid))
         if len(metrics_dicts) < 3:
-            print("Got no or incomplete metrics for model %s, skipping..." % model_uuid)
+            print(f"Got no or incomplete metrics for model {model_uuid}, skipping...")
             continue
         # TODO: get_full_metadata() seems to ignore label='best' constraint; below is workaround
         #if len(metrics_dicts) > 3:
@@ -153,7 +146,7 @@ def get_training_perf_table(dataset_key, bucket, collection_name, pred_type='reg
             rf_max_depth_list.append(nan)
             xgb_learning_rate_list.append(nan)
             xgb_gamma_list.append(nan)
-        if model_type == 'RF':
+        elif model_type == 'RF':
             rf_params = metadata_dict['ModelMetadata']['RFSpecific']
             rf_estimators_list.append(rf_params['rf_estimators'])
             rf_max_features_list.append(rf_params['rf_max_features'])
@@ -165,7 +158,7 @@ def get_training_perf_table(dataset_key, bucket, collection_name, pred_type='reg
             dropouts_list.append(nan)
             xgb_learning_rate_list.append(nan)
             xgb_gamma_list.append(nan)
-        if model_type == 'xgboost':
+        elif model_type == 'xgboost':
             xgb_params = metadata_dict['ModelMetadata']['xgbSpecific']
             rf_estimators_list.append(nan)
             rf_max_features_list.append(nan)
@@ -197,9 +190,9 @@ def get_training_perf_table(dataset_key, bucket, collection_name, pred_type='reg
                     xgb_learning_rate = xgb_learning_rate_list,
                     xgb_gamma = xgb_gamma_list))
     for subset in subsets:
-        metric_col = '%s_%s' % (metric_type, subset)
+        metric_col = f'{metric_type}_{subset}'
         perf_df[metric_col] = score_dict[subset]
-    sort_metric = '%s_valid' % metric_type
+    sort_metric = f'{metric_type}_valid'
 
     perf_df = perf_df.sort_values(sort_metric, ascending=False)
     return perf_df
@@ -222,31 +215,30 @@ def get_best_perf_table(col_name, metric_type, model_uuid=None, metadata_dict=No
                         # "ModelMetrics.TrainingRun.label" : "best"
                         }
         models = list(trkr.get_full_metadata(model_filter, client_wrapper, collection_name=col_name))
-        if models == []:
+        if not models:
             print("No matching models returned")
             return
         elif len(models) > 1:
             print("Found %d matching models, which is too many" % len(models))
             return
         metadata_dict = models[0]
-    
-    model_info = {}
-    
-    model_info['model_uuid'] = metadata_dict['model_uuid']
+
+    model_info = {'model_uuid': metadata_dict['model_uuid']}
+
     #print("Got metadata for model UUID %s" % model_info['model_uuid'])
-    
+
     # Get model metrics for this model
     metrics_dicts = metadata_dict['ModelMetrics']['TrainingRun']
     # workaround for now
     # metrics_dicts = [m for m in metrics_dicts if m['label'] == 'best']
     # print("Got %d metrics dicts for model %s" % (len(metrics_dicts), model_uuid))
     if len(metrics_dicts) < 3:
-        print("Got no or incomplete metrics for model %s, skipping..." % model_uuid)
+        print(f"Got no or incomplete metrics for model {model_uuid}, skipping...")
         return
     if len(metrics_dicts) > 3:
         metrics_dicts = [m for m in metrics_dicts if m['label'] == 'best']
         # raise Exception('Got more than one set of best epoch metrics for model %s' % model_uuid)
-    
+
     model_params = metadata_dict['ModelMetadata']['ModelParameters']
     model_info['model_type'] = model_params['model_type']
     model_info['featurizer'] = model_params['featurizer']
@@ -295,14 +287,14 @@ def get_best_perf_table(col_name, metric_type, model_uuid=None, metadata_dict=No
         model_info['learning_rate'] = nan
         model_info['layer_sizes'] = nan
         model_info['dropouts'] = nan
-    
+
     for metrics_dict in metrics_dicts:
         subset = metrics_dict['subset']
-        metric_col = '%s_%s' % (metric_type, subset)
+        metric_col = f'{metric_type}_{subset}'
         model_info[metric_col] = metrics_dict['PredictionResults'][metric_type]
-        metric_col = 'rms_score_%s' % subset
+        metric_col = f'rms_score_{subset}'
         model_info[metric_col] = metrics_dict['PredictionResults']['rms_score']
-    
+
     return model_info
 
 

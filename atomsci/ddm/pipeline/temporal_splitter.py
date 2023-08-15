@@ -67,7 +67,7 @@ class TemporalSplitter(Splitter):
         training and validation sets using self.base_splitter. Note that frac_test is ignored, since the test split is based
         on dates only.
         """
-        if not (self.date_col in attr_df.columns.values):
+        if self.date_col not in attr_df.columns.values:
             raise ValueError("date_col missing from dataset attributes")
         cmpd_dates = attr_df[self.date_col].values
         test_ind = np.where(cmpd_dates > self.cutoff_date)[0]
